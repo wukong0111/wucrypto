@@ -1,0 +1,25 @@
+{
+  "name": "wucrypto",
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "bun@1.3.13",
+  "scripts": {
+    "dev": "bun --hot src/index.tsx",
+    "build:css": "bunx @tailwindcss/cli -i src/styles/input.css -o public/app.css --minify",
+    "watch:css": "bunx @tailwindcss/cli -i src/styles/input.css -o public/app.css --watch",
+    "typecheck": "bun tsc --noEmit",
+    "lint": "bun x biome check --write .",
+    "lint:ci": "bun x biome ci .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.12.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@tailwindcss/cli": "^4.2.0",
+    "@types/bun": "^1.2.0",
+    "tailwindcss": "^4.2.0",
+    "typescript": "^5.8.0"
+  }
+}
