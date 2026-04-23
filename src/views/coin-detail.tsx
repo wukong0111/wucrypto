@@ -39,11 +39,17 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId }) => 
       <h1 class="text-2xl font-bold mb-2">
         {coin.name} <span class="text-gray-400 text-lg">{coin.symbol.toUpperCase()}</span>
       </h1>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+      <div class="grid grid-cols-3 sm:grid-cols-5 gap-4 text-sm">
         <div>
           <div class="text-gray-400">Holding</div>
           <div class="font-semibold">
             {derived.holding.toFixed(8).replace(/0+$/, "").replace(/\.$/, ".0")}
+          </div>
+        </div>
+        <div>
+          <div class="text-gray-400">Avg Price</div>
+          <div class="font-semibold">
+            {fmtUsd(derived.holding > 0 ? derived.costBasis / derived.holding : null)}
           </div>
         </div>
         <div>
@@ -178,7 +184,9 @@ export const MovementRow: FC<MovementRowProps> = ({ movement, groupId, coinId })
   return (
     <tr id={`mov-${movement.id}`} class="border-b border-gray-800/50 hover:bg-gray-900">
       <td class="py-2 pl-0 pr-3">{dateStr}</td>
-      <td class={`py-2 px-3 ${movement.type === "buy" ? "text-pnl-positive" : "text-pnl-negative"}`}>
+      <td
+        class={`py-2 px-3 ${movement.type === "buy" ? "text-pnl-positive" : "text-pnl-negative"}`}
+      >
         {movement.type.toUpperCase()}
       </td>
       <td class="py-2 px-3 text-right">{movement.amount}</td>
