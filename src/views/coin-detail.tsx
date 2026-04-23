@@ -142,13 +142,13 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId }) => 
     <table class="w-full text-sm">
       <thead>
         <tr class="text-gray-400 border-b border-gray-800">
-          <th class="text-left py-2">Date</th>
-          <th class="text-left py-2">Type</th>
-          <th class="text-right py-2">Amount</th>
-          <th class="text-right py-2">Price/Coin</th>
-          <th class="text-right py-2">Total</th>
-          <th class="text-left py-2">Note</th>
-          <th class="text-right py-2" />
+          <th class="text-left py-2 pl-0 pr-3">Date</th>
+          <th class="text-left py-2 px-3">Type</th>
+          <th class="text-right py-2 px-3">Amount</th>
+          <th class="text-right py-2 px-3">Price/Coin</th>
+          <th class="text-right py-2 px-3">Total</th>
+          <th class="text-left py-2 px-3">Note</th>
+          <th class="text-right py-2 pl-3 pr-0" />
         </tr>
       </thead>
       <tbody id="movements-body">
@@ -177,15 +177,15 @@ export const MovementRow: FC<MovementRowProps> = ({ movement, groupId, coinId })
   const dateStr = new Date(movement.date).toLocaleDateString();
   return (
     <tr id={`mov-${movement.id}`} class="border-b border-gray-800/50 hover:bg-gray-900">
-      <td class="py-2">{dateStr}</td>
-      <td class={`py-2 ${movement.type === "buy" ? "text-pnl-positive" : "text-pnl-negative"}`}>
+      <td class="py-2 pl-0 pr-3">{dateStr}</td>
+      <td class={`py-2 px-3 ${movement.type === "buy" ? "text-pnl-positive" : "text-pnl-negative"}`}>
         {movement.type.toUpperCase()}
       </td>
-      <td class="py-2 text-right">{movement.amount}</td>
-      <td class="py-2 text-right">{fmtUsd(movement.pricePerCoin)}</td>
-      <td class="py-2 text-right">{fmtUsd(total)}</td>
-      <td class="py-2 text-gray-400 max-w-[200px] truncate">{movement.note || "—"}</td>
-      <td class="py-2 text-right">
+      <td class="py-2 px-3 text-right">{movement.amount}</td>
+      <td class="py-2 px-3 text-right">{fmtUsd(movement.pricePerCoin)}</td>
+      <td class="py-2 px-3 text-right">{fmtUsd(total)}</td>
+      <td class="py-2 px-3 text-gray-400 max-w-[200px] truncate">{movement.note || "—"}</td>
+      <td class="py-2 pl-3 pr-0 text-right">
         <button
           type="button"
           hx-delete={`/groups/${groupId}/coins/${coinId}/movements/${movement.id}`}
