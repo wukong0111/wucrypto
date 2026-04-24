@@ -60,7 +60,7 @@ const coinId = slugMatch[1];
 const txRe = /data-portfolio-coin-transaction-data="([^"]+)"/g;
 const transactions: GeckoTx[] = [];
 for (const m of html.matchAll(txRe)) {
-  const decoded = decodeHtmlEntities(m[1]);
+  const decoded = decodeHtmlEntities(m[1]!);
   const tx = JSON.parse(decoded) as GeckoTx;
   if (
     tx.transaction_type !== "buy" &&
@@ -79,16 +79,14 @@ if (transactions.length === 0) {
   process.exit(0);
 }
 
-const coinFile = await Bun.file(outputPath)
-  .json<CoinFile>()
-  .catch(() => null);
+const coinFile = (await Bun.file(outputPath).json().catch(() => null)) as CoinFile | null;
 if (!coinFile) {
   console.error(`Error: output file not found: ${outputPath}`);
   process.exit(1);
 }
 
 const existingKeys = new Set(
-  coinFile.movements.map((m) => `${m.date}|${m.amount}|${m.pricePerCoin}`),
+  coinFile.movements.map((m: Movement) => `${m.date}|${m.amount}|${m.pricePerCoin}`),
 );
 
 let skipped = 0;
