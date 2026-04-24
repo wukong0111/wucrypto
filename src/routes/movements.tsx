@@ -21,7 +21,7 @@ movements.get("/groups/:groupId/coins/:coinId", async (c) => {
 
   return c.html(
     <Layout title={`${coin.name} — ${group.name}`}>
-      <CoinDetailView coin={coin} derived={derived} groupId={groupId} />
+      <CoinDetailView coin={coin} derived={derived} groupId={groupId} groupName={group.name} />
     </Layout>,
   );
 });
@@ -42,7 +42,9 @@ movements.post("/groups/:groupId/coins/:coinId/movements", async (c) => {
     amount <= 0 ||
     pricePerCoin <= 0
   ) {
-    return c.html(<span class="text-red-400 text-sm">Invalid movement data</span>, 400);
+    c.header("HX-Retarget", "#add-movement-error");
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(<span>Invalid movement data</span>, 400);
   }
 
   const movement = {

@@ -51,7 +51,11 @@ coins.post("/groups/:groupId/coins", async (c) => {
   const symbol = String(body["symbol"] ?? "").trim();
   const name = String(body["name"] ?? "").trim();
 
-  if (!coinId) return c.html(<span class="text-red-400 text-sm">Select a coin first</span>, 400);
+  if (!coinId) {
+    c.header("HX-Retarget", "#add-coin-error");
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(<span>Select a coin first</span>, 400);
+  }
 
   const coin = { coinId, symbol, name, movements: [] };
   await upsertCoin(groupId, coin);
@@ -70,10 +74,14 @@ coins.delete("/groups/:groupId/coins/:coinId", async (c) => {
 
 coins.get("/api/coins/search", async (c) => {
   const q = c.req.query("q") ?? "";
-  if (!q.trim()) return c.text("", 200);
+  if (!q.trim()) return c.html("", 200);
 
   const results = await searchCoins(q);
-  if (results.length === 0) return c.text("", 200);
+  if (results.length === 0) {
+    return c.html(
+      <li class="px-3 py-3 text-gray-500 text-sm text-center cursor-default">No results found</li>,
+    );
+  }
 
   return c.html(
     <ul>
@@ -84,7 +92,7 @@ coins.get("/api/coins/search", async (c) => {
           data-coin-symbol={r.symbol}
           data-coin-name={r.name}
           data-coin-display={`${r.name} (${r.symbol.toUpperCase()})`}
-          class="px-3 py-2 hover:bg-gray-700 cursor-pointer text-sm"
+          class="px-3 py-2.5 hover:bg-gray-700 cursor-pointer text-sm flex items-center justify-between"
           hx-on:click={`
             var li = event.target.closest('li');
             document.getElementById('add-coin-id').value = li.dataset.coinId;
@@ -94,7 +102,8 @@ coins.get("/api/coins/search", async (c) => {
             document.getElementById('search-results').innerHTML = '';
           `}
         >
-          {r.name} <span class="text-gray-400">({r.symbol.toUpperCase()})</span>
+          <span>{r.name}</span>
+          <span class="text-gray-400 text-xs">{r.symbol.toUpperCase()}</span>
         </li>
       ))}
     </ul>,

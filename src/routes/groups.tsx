@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createGroup, deleteGroup, listGroups } from "../lib/storage";
-import HomeView, { GroupItemFragment } from "../views/home";
+import HomeView, { GroupItem } from "../views/home";
 import Layout from "../views/layout";
 
 const groups = new Hono();
@@ -18,10 +18,12 @@ groups.post("/groups", async (c) => {
   const body = await c.req.parseBody();
   const name = String(body["name"] ?? "").trim();
   if (!name) {
-    return c.html(<span class="text-red-400 text-sm">Name is required</span>, 400);
+    c.header("HX-Retarget", "#new-group-error");
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(<span>Name is required</span>, 400);
   }
   const group = await createGroup(name);
-  return c.html(<GroupItemFragment group={group} />);
+  return c.html(<GroupItem group={group} />);
 });
 
 groups.delete("/groups/:groupId", async (c) => {

@@ -47,7 +47,7 @@ describe("GET /", () => {
     const res = await app.request("/");
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain("Crypto Tracker");
+    expect(html).toContain("Wucrypto");
   });
 
   test("shows empty state", async () => {

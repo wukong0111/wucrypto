@@ -3,6 +3,10 @@
 @theme {
   --color-pnl-positive: #4ade80;
   --color-pnl-negative: #f87171;
+  --color-surface: #111827;
+  --color-surface-elevated: #1f2937;
+  --color-border: #1f2937;
+  --color-border-strong: #374151;
 }
 
 [data-confirm-delete] {
@@ -10,6 +14,5 @@
 }
 [data-confirm-delete].confirm-pending {
   color: #f87171 !important;
-  font-weight: 600;
-  transform: scale(1.1);
+  transform: scale(1.15);
 }
