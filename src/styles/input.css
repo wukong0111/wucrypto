@@ -4,3 +4,12 @@
   --color-pnl-positive: #4ade80;
   --color-pnl-negative: #f87171;
 }
+
+[data-confirm-delete] {
+  transition: color 0.15s, transform 0.15s;
+}
+[data-confirm-delete].confirm-pending {
+  color: #f87171 !important;
+  font-weight: 600;
+  transform: scale(1.1);
+}

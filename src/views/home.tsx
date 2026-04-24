@@ -54,7 +54,7 @@ export const GroupItem: FC<GroupItemProps> = ({ group }) => (
       hx-delete={`/groups/${group.id}`}
       hx-target={`#group-${group.id}`}
       hx-swap="outerHTML"
-      hx-confirm="Delete this group and all its coins?"
+      data-confirm-delete
       class="text-gray-500 hover:text-red-400 text-sm"
     >
       Delete
@@ -75,7 +75,7 @@ export const GroupItemFragment: FC<GroupItemProps> = ({ group }) => (
       hx-delete={`/groups/${group.id}`}
       hx-target={`#group-${group.id}`}
       hx-swap="outerHTML"
-      hx-confirm="Delete this group and all its coins?"
+      data-confirm-delete
       class="text-gray-500 hover:text-red-400 text-sm"
     >
       Delete

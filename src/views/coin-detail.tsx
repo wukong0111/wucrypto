@@ -199,7 +199,7 @@ export const MovementRow: FC<MovementRowProps> = ({ movement, groupId, coinId })
           hx-delete={`/groups/${groupId}/coins/${coinId}/movements/${movement.id}`}
           hx-target={`#mov-${movement.id}`}
           hx-swap="outerHTML"
-          hx-confirm="Delete this movement?"
+          data-confirm-delete
           class="text-gray-500 hover:text-red-400"
         >
           &times;
