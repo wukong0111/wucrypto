@@ -79,7 +79,9 @@ if (transactions.length === 0) {
   process.exit(0);
 }
 
-const coinFile = (await Bun.file(outputPath).json().catch(() => null)) as CoinFile | null;
+const coinFile = (await Bun.file(outputPath)
+  .json()
+  .catch(() => null)) as CoinFile | null;
 if (!coinFile) {
   console.error(`Error: output file not found: ${outputPath}`);
   process.exit(1);
