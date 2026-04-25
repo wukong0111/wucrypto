@@ -5,7 +5,7 @@
 - **Runtime:** Bun (exclusive — no Node.js tooling)
 - **Framework:** Hono on Bun.serve — server-rendered HTML via JSX views
 - **Frontend:** HTMX for dynamic interactions, Tailwind v4 for styling. No client-side JS framework.
-- **Storage:** JSON files on disk via `node:fs/promises` under `data/groups/`
+- **Storage:** PostgreSQL via Drizzle ORM (`src/lib/db/`)
 - **Testing:** `bun:test`
 - **Linting/Formatting:** Biome
 
@@ -105,10 +105,11 @@ This project uses **Bun** as the exclusive runtime, package manager, and test ru
 
 ### Data persistence
 
-- JSON files under `data/groups/<group-slug>/` — one `group.json` + `coins/<coin-id>.json` per group.
-- `src/lib/storage.ts` handles all file I/O with advisory locking.
+- PostgreSQL via Drizzle ORM. Schema in `src/lib/db/schema.ts`: `users → groups → coins → movements`.
+- `src/lib/storage.ts` wraps all DB queries (groups, coins, movements).
 - `src/lib/calc.ts` computes derived values (holding, P&L) from movements + live prices.
 - `src/lib/coingecko.ts` fetches prices with a 60s in-memory cache.
+- Migrations in `drizzle/` — applied at deploy via `scripts/migrate.ts`.
 
 ## TypeScript (mandatory, strict)
 
