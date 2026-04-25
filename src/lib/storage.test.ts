@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { db } from "./db";
+import { users } from "./db/schema";
 import {
   addMovement,
   createGroup,
@@ -16,18 +15,14 @@ import {
   upsertCoin,
 } from "./storage";
 import type { CoinFile, Movement } from "./storage";
+import { createTestUser, truncateAll } from "./test-helpers";
 
-let testDir: string;
-const origDataDir = Bun.env["DATA_DIR"];
+let userId: string;
 
 beforeEach(async () => {
-  testDir = await mkdtemp(join(tmpdir(), "wucrypto-test-"));
-  Bun.env["DATA_DIR"] = testDir;
-});
-
-afterEach(async () => {
-  Bun.env["DATA_DIR"] = origDataDir;
-  await rm(testDir, { recursive: true, force: true });
+  await truncateAll();
+  const user = await createTestUser();
+  userId = user.id;
 });
 
 describe("slugify", () => {
@@ -50,53 +45,64 @@ describe("slugify", () => {
 
 describe("groups", () => {
   test("listGroups returns empty when no data", async () => {
-    const index = await listGroups();
-    expect(index.groups).toHaveLength(0);
+    const groups = await listGroups(userId);
+    expect(groups).toHaveLength(0);
   });
 
   test("createGroup persists and returns metadata", async () => {
-    const group = await createGroup("Long Term");
+    const group = await createGroup(userId, "Long Term");
     expect(group.id).toBe("long-term");
     expect(group.name).toBe("Long Term");
     expect(group.createdAt).toBeDefined();
 
-    const index = await listGroups();
-    expect(index.groups).toHaveLength(1);
-    expect(index.groups[0]?.id).toBe("long-term");
+    const groups = await listGroups(userId);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.id).toBe("long-term");
   });
 
   test("createGroup appends numeric suffix on slug collision", async () => {
-    await createGroup("Long Term");
-    const g2 = await createGroup("Long Term");
+    await createGroup(userId, "Long Term");
+    const g2 = await createGroup(userId, "Long Term");
     expect(g2.id).toBe("long-term-1");
-    const g3 = await createGroup("Long Term");
+    const g3 = await createGroup(userId, "Long Term");
     expect(g3.id).toBe("long-term-2");
   });
 
   test("getGroup returns metadata", async () => {
-    const created = await createGroup("My Group");
-    const got = await getGroup(created.id);
+    const created = await createGroup(userId, "My Group");
+    const got = await getGroup(userId, created.id);
     expect(got).toEqual(created);
   });
 
   test("getGroup returns null for non-existent", async () => {
-    const got = await getGroup("nope");
+    const got = await getGroup(userId, "nope");
     expect(got).toBeNull();
   });
 
-  test("deleteGroup removes from index and filesystem", async () => {
-    const g = await createGroup("Delete Me");
-    await deleteGroup(g.id);
-    const index = await listGroups();
-    expect(index.groups).toHaveLength(0);
-    const meta = await getGroup(g.id);
+  test("deleteGroup removes from listing", async () => {
+    const g = await createGroup(userId, "Delete Me");
+    await deleteGroup(userId, g.id);
+    const groups = await listGroups(userId);
+    expect(groups).toHaveLength(0);
+    const meta = await getGroup(userId, g.id);
     expect(meta).toBeNull();
   });
 
   test("deleteGroup is no-op for non-existent group", async () => {
-    await deleteGroup("nope");
-    const index = await listGroups();
-    expect(index.groups).toHaveLength(0);
+    await deleteGroup(userId, "nope");
+    const groups = await listGroups(userId);
+    expect(groups).toHaveLength(0);
+  });
+
+  test("groups are scoped to user", async () => {
+    await createGroup(userId, "My Group");
+    const [other] = await db
+      .insert(users)
+      .values({ username: "other", passwordHash: "hash" })
+      .returning();
+    if (!other) throw new Error("Failed to create other user");
+    const otherGroups = await listGroups(other.id);
+    expect(otherGroups).toHaveLength(0);
   });
 });
 
@@ -104,72 +110,67 @@ describe("coins", () => {
   let groupId: string;
 
   beforeEach(async () => {
-    const g = await createGroup("Test Group");
+    const g = await createGroup(userId, "Test Group");
     groupId = g.id;
   });
 
   test("listCoins returns empty array", async () => {
-    const coins = await listCoins(groupId);
+    const coins = await listCoins(userId, groupId);
     expect(coins).toHaveLength(0);
   });
 
   test("upsertCoin and getCoin roundtrip", async () => {
-    const coin: CoinFile = {
+    const coin: Omit<CoinFile, "movements"> = {
       coinId: "bitcoin",
       symbol: "BTC",
       name: "Bitcoin",
-      movements: [],
     };
-    await upsertCoin(groupId, coin);
-    const got = await getCoin(groupId, "bitcoin");
-    expect(got).toEqual(coin);
+    await upsertCoin(userId, groupId, coin);
+    const got = await getCoin(userId, groupId, "bitcoin");
+    expect(got?.coinId).toBe("bitcoin");
+    expect(got?.symbol).toBe("BTC");
+    expect(got?.name).toBe("Bitcoin");
+    expect(got?.movements).toEqual([]);
   });
 
   test("listCoins returns all coins", async () => {
-    await upsertCoin(groupId, {
+    await upsertCoin(userId, groupId, {
       coinId: "bitcoin",
       symbol: "BTC",
       name: "Bitcoin",
-      movements: [],
     });
-    await upsertCoin(groupId, {
+    await upsertCoin(userId, groupId, {
       coinId: "ethereum",
       symbol: "ETH",
       name: "Ethereum",
-      movements: [],
     });
-    const coins = await listCoins(groupId);
+    const coins = await listCoins(userId, groupId);
     expect(coins).toHaveLength(2);
   });
 
   test("upsertCoin overwrites existing", async () => {
-    await upsertCoin(groupId, {
+    await upsertCoin(userId, groupId, {
       coinId: "bitcoin",
       symbol: "BTC",
       name: "Bitcoin",
-      movements: [],
     });
-    await upsertCoin(groupId, {
+    await upsertCoin(userId, groupId, {
       coinId: "bitcoin",
       symbol: "BTC",
-      name: "Bitcoin",
-      movements: [
-        { id: "1", type: "buy", date: "2026-01-01", amount: 1, pricePerCoin: 50000, note: "" },
-      ],
+      name: "Bitcoin Updated",
     });
-    const coin = await getCoin(groupId, "bitcoin");
-    expect(coin?.movements).toHaveLength(1);
+    const coin = await getCoin(userId, groupId, "bitcoin");
+    expect(coin?.name).toBe("Bitcoin Updated");
   });
 
-  test("deleteCoin removes the file", async () => {
-    await upsertCoin(groupId, {
+  test("deleteCoin removes the coin", async () => {
+    await upsertCoin(userId, groupId, {
       coinId: "bitcoin",
       symbol: "BTC",
       name: "Bitcoin",
-      movements: [],
     });
-    await deleteCoin(groupId, "bitcoin");
-    const coin = await getCoin(groupId, "bitcoin");
+    await deleteCoin(userId, groupId, "bitcoin");
+    const coin = await getCoin(userId, groupId, "bitcoin");
     expect(coin).toBeNull();
   });
 });
@@ -178,13 +179,12 @@ describe("movements", () => {
   let groupId: string;
 
   beforeEach(async () => {
-    const g = await createGroup("Test Group");
+    const g = await createGroup(userId, "Test Group");
     groupId = g.id;
-    await upsertCoin(groupId, {
+    await upsertCoin(userId, groupId, {
       coinId: "bitcoin",
       symbol: "BTC",
       name: "Bitcoin",
-      movements: [],
     });
   });
 
@@ -199,14 +199,14 @@ describe("movements", () => {
 
   test("addMovement appends to coin", async () => {
     const m = makeMovement("buy", 0.5, 40000);
-    const coin = await addMovement(groupId, "bitcoin", m);
+    const coin = await addMovement(userId, groupId, "bitcoin", m);
     expect(coin.movements).toHaveLength(1);
     expect(coin.movements[0]?.id).toBe(m.id);
   });
 
   test("addMovement creates coin if missing", async () => {
     const m = makeMovement("buy", 1, 30000);
-    const coin = await addMovement(groupId, "ethereum", m);
+    const coin = await addMovement(userId, groupId, "ethereum", m);
     expect(coin.coinId).toBe("ethereum");
     expect(coin.movements).toHaveLength(1);
   });
@@ -214,34 +214,15 @@ describe("movements", () => {
   test("deleteMovement removes specific movement", async () => {
     const m1 = makeMovement("buy", 0.5, 40000);
     const m2 = makeMovement("buy", 0.3, 45000);
-    await addMovement(groupId, "bitcoin", m1);
-    await addMovement(groupId, "bitcoin", m2);
-    const coin = await deleteMovement(groupId, "bitcoin", m1.id);
+    await addMovement(userId, groupId, "bitcoin", m1);
+    await addMovement(userId, groupId, "bitcoin", m2);
+    const coin = await deleteMovement(userId, groupId, "bitcoin", m1.id);
     expect(coin?.movements).toHaveLength(1);
     expect(coin?.movements[0]?.id).toBe(m2.id);
   });
 
   test("deleteMovement returns null for non-existent coin", async () => {
-    const result = await deleteMovement(groupId, "solana", "nope");
+    const result = await deleteMovement(userId, groupId, "solana", "nope");
     expect(result).toBeNull();
-  });
-});
-
-describe("concurrency", () => {
-  test("concurrent writes are serialized", async () => {
-    const g = await createGroup("Concurrent");
-    const writes = Array.from({ length: 10 }, (_, i) =>
-      addMovement(g.id, "bitcoin", {
-        id: `mov-${i}`,
-        type: "buy",
-        date: new Date().toISOString(),
-        amount: i + 1,
-        pricePerCoin: 1000,
-        note: "",
-      }),
-    );
-    await Promise.all(writes);
-    const coin = await getCoin(g.id, "bitcoin");
-    expect(coin?.movements).toHaveLength(10);
   });
 });

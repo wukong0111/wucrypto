@@ -5,14 +5,17 @@ import { addMovement, deleteMovement, getCoin, getGroup } from "../lib/storage";
 import CoinDetailView, { MovementRow } from "../views/coin-detail";
 import Layout from "../views/layout";
 
-const movements = new Hono();
+const movements = new Hono<{
+  Variables: { user: { id: string; username: string } };
+}>();
 
 movements.get("/groups/:groupId/coins/:coinId", async (c) => {
+  const user = c.get("user");
   const { groupId, coinId } = c.req.param();
-  const group = await getGroup(groupId);
+  const group = await getGroup(user.id, groupId);
   if (!group) return c.text("Group not found", 404);
 
-  const coin = await getCoin(groupId, coinId);
+  const coin = await getCoin(user.id, groupId, coinId);
   if (!coin) return c.text("Coin not found", 404);
 
   const prices = await fetchPrices([coinId]);
@@ -20,13 +23,14 @@ movements.get("/groups/:groupId/coins/:coinId", async (c) => {
   const derived = calcPnl(coin.movements, price);
 
   return c.html(
-    <Layout title={`${coin.name} — ${group.name}`}>
+    <Layout title={`${coin.name} — ${group.name}`} username={user.username}>
       <CoinDetailView coin={coin} derived={derived} groupId={groupId} groupName={group.name} />
     </Layout>,
   );
 });
 
 movements.post("/groups/:groupId/coins/:coinId/movements", async (c) => {
+  const user = c.get("user");
   const { groupId, coinId } = c.req.param();
   const body = await c.req.parseBody();
   const type = String(body["type"] ?? "buy") as "buy" | "sell";
@@ -56,13 +60,14 @@ movements.post("/groups/:groupId/coins/:coinId/movements", async (c) => {
     note,
   };
 
-  await addMovement(groupId, coinId, movement);
+  await addMovement(user.id, groupId, coinId, movement);
   return c.html(<MovementRow movement={movement} groupId={groupId} coinId={coinId} />);
 });
 
 movements.delete("/groups/:groupId/coins/:coinId/movements/:movId", async (c) => {
+  const user = c.get("user");
   const { groupId, coinId, movId } = c.req.param();
-  await deleteMovement(groupId, coinId, movId);
+  await deleteMovement(user.id, groupId, coinId, movId);
   return c.text("", 200);
 });
 

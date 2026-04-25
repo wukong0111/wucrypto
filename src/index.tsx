@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { authMiddleware } from "./middleware/auth";
+import authRoutes from "./routes/auth";
 import coinRoutes from "./routes/coins";
 import groups from "./routes/groups";
 import movementRoutes from "./routes/movements";
@@ -10,9 +12,15 @@ app.use("/favicon.svg", serveStatic({ root: "./public" }));
 app.use("/app.css", serveStatic({ root: "./public" }));
 app.use("/htmx.min.js", serveStatic({ root: "./public" }));
 
-app.route("/", groups);
-app.route("/", coinRoutes);
-app.route("/", movementRoutes);
+app.route("/", authRoutes);
+
+type AuthVars = { Variables: { user: { id: string; username: string } } };
+const protectedRoutes = new Hono<AuthVars>();
+protectedRoutes.use("*", authMiddleware);
+protectedRoutes.route("/", groups);
+protectedRoutes.route("/", coinRoutes);
+protectedRoutes.route("/", movementRoutes);
+app.route("/", protectedRoutes);
 
 const port = Number(Bun.env["PORT"]) || 3000;
 

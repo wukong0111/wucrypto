@@ -5,14 +5,17 @@ import { deleteCoin, getGroup, listCoins, upsertCoin } from "../lib/storage";
 import GroupDetailView, { CoinRow } from "../views/group-detail";
 import Layout from "../views/layout";
 
-const coins = new Hono();
+const coins = new Hono<{
+  Variables: { user: { id: string; username: string } };
+}>();
 
 coins.get("/groups/:groupId", async (c) => {
+  const user = c.get("user");
   const { groupId } = c.req.param();
-  const group = await getGroup(groupId);
+  const group = await getGroup(user.id, groupId);
   if (!group) return c.text("Group not found", 404);
 
-  const coinList = await listCoins(groupId);
+  const coinList = await listCoins(user.id, groupId);
   const coinIds = coinList.map((coin) => coin.coinId);
   const prices = await fetchPrices(coinIds);
 
@@ -32,7 +35,7 @@ coins.get("/groups/:groupId", async (c) => {
   const summary = calcGroupSummary(summaryInput);
 
   return c.html(
-    <Layout title={group.name}>
+    <Layout title={group.name} username={user.username}>
       <GroupDetailView
         group={group}
         coins={coinList}
@@ -45,6 +48,7 @@ coins.get("/groups/:groupId", async (c) => {
 });
 
 coins.post("/groups/:groupId/coins", async (c) => {
+  const user = c.get("user");
   const { groupId } = c.req.param();
   const body = await c.req.parseBody();
   const coinId = String(body["coinId"] ?? "").trim();
@@ -58,7 +62,7 @@ coins.post("/groups/:groupId/coins", async (c) => {
   }
 
   const coin = { coinId, symbol, name, movements: [] };
-  await upsertCoin(groupId, coin);
+  await upsertCoin(user.id, groupId, coin);
   const prices = await fetchPrices([coinId]);
   const price = prices.get(coinId) ?? null;
   const derived = calcPnl([], price);
@@ -67,8 +71,9 @@ coins.post("/groups/:groupId/coins", async (c) => {
 });
 
 coins.delete("/groups/:groupId/coins/:coinId", async (c) => {
+  const user = c.get("user");
   const { groupId, coinId } = c.req.param();
-  await deleteCoin(groupId, coinId);
+  await deleteCoin(user.id, groupId, coinId);
   return c.text("", 200);
 });
 

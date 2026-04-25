@@ -10,15 +10,22 @@
     "typecheck": "bun tsc --noEmit",
     "lint": "bun x biome check --write .",
     "lint:ci": "bun x biome ci .",
-    "test": "bun test"
+    "test": "DATABASE_URL=postgres://wucrypto:wucrypto@localhost:5432/wucrypto_test bun test",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:push": "bunx drizzle-kit push",
+    "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
-    "hono": "^4.12.0"
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.0",
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
     "@tailwindcss/cli": "^4.2.0",
     "@types/bun": "^1.2.0",
+    "drizzle-kit": "^0.31.10",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.8.0"
   }

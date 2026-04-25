@@ -3,6 +3,7 @@ import { Navbar } from "./components/Navbar";
 
 type LayoutProps = {
   title: string;
+  username?: string;
 };
 
 const confirmScript = `
@@ -52,7 +53,7 @@ document.addEventListener("htmx:beforeRequest", function(e) {
 });
 `;
 
-const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, children }) => (
+const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, username, children }) => (
   <html lang="en">
     <head>
       <meta charset="utf-8" />
@@ -63,7 +64,7 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, children }) => (
       <script src="/htmx.min.js" />
     </head>
     <body class="bg-gray-950 text-gray-100 min-h-screen">
-      <Navbar />
+      <Navbar username={username} />
       <main class="max-w-4xl mx-auto px-4 py-8">{children}</main>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static htmx config, no user input */}
       <script dangerouslySetInnerHTML={{ __html: htmxConfig }} />

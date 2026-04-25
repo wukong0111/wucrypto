@@ -1,5 +1,10 @@
-import { mkdir, readdir, rename, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { and, eq } from "drizzle-orm";
+import { db } from "./db";
+import {
+  coins as coinsTable,
+  groups as groupsTable,
+  movements as movementsTable,
+} from "./db/schema";
 
 export type Movement = {
   id: string;
@@ -16,19 +21,12 @@ export type GroupMeta = {
   createdAt: string;
 };
 
-export type GroupIndex = {
-  groups: GroupMeta[];
-};
-
 export type CoinFile = {
   coinId: string;
   symbol: string;
   name: string;
   movements: Movement[];
 };
-
-const dataDir = () => Bun.env["DATA_DIR"] || "./data";
-const locks = new Map<string, Promise<void>>();
 
 export function slugify(name: string): string {
   return name
@@ -37,154 +35,253 @@ export function slugify(name: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-async function ensureDir(dir: string): Promise<void> {
-  await mkdir(dir, { recursive: true });
+async function resolveGroupId(userId: string, slug: string): Promise<string | null> {
+  const [row] = await db
+    .select({ id: groupsTable.id })
+    .from(groupsTable)
+    .where(and(eq(groupsTable.userId, userId), eq(groupsTable.slug, slug)))
+    .limit(1);
+  return row?.id ?? null;
 }
 
-async function readJson<T>(filePath: string): Promise<T | null> {
-  try {
-    const file = Bun.file(filePath);
-    if (!(await file.exists())) return null;
-    return (await file.json()) as T;
-  } catch {
-    return null;
-  }
+export async function listGroups(userId: string): Promise<GroupMeta[]> {
+  const rows = await db
+    .select()
+    .from(groupsTable)
+    .where(eq(groupsTable.userId, userId))
+    .orderBy(groupsTable.createdAt);
+  return rows.map((r) => ({
+    id: r.slug,
+    name: r.name,
+    createdAt: r.createdAt.toISOString(),
+  }));
 }
 
-async function writeJson<T>(filePath: string, data: T): Promise<void> {
-  await ensureDir(join(filePath, ".."));
-  const tmp = `${filePath}.tmp`;
-  await Bun.write(tmp, `${JSON.stringify(data, null, 2)}\n`);
-  await rename(tmp, filePath);
-}
+export async function createGroup(userId: string, name: string): Promise<GroupMeta> {
+  const base = slugify(name) || "group";
+  const existing = await db
+    .select({ slug: groupsTable.slug })
+    .from(groupsTable)
+    .where(and(eq(groupsTable.userId, userId), eq(groupsTable.slug, base)));
 
-async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const prev = locks.get(key) ?? Promise.resolve();
-  let resolve: () => void = () => {};
-  const next = new Promise<void>((r) => {
-    resolve = r;
-  });
-  locks.set(key, next);
-  await prev;
-  try {
-    return await fn();
-  } finally {
-    resolve();
-  }
-}
-
-const groupsIndexPath = () => join(dataDir(), "groups.json");
-const groupDir = (id: string) => join(dataDir(), "groups", id);
-const groupMetaPath = (id: string) => join(groupDir(id), "group.json");
-const coinsDir = (groupId: string) => join(groupDir(groupId), "coins");
-const coinPath = (groupId: string, coinId: string) => join(coinsDir(groupId), `${coinId}.json`);
-
-export async function listGroups(): Promise<GroupIndex> {
-  return (await readJson<GroupIndex>(groupsIndexPath())) ?? { groups: [] };
-}
-
-export async function createGroup(name: string): Promise<GroupMeta> {
-  return withLock(groupsIndexPath(), async () => {
-    const index = await listGroups();
-    const base = slugify(name);
-    let id = base || "group";
+  let slug = base;
+  if (existing.length > 0) {
+    const allSlugs = await db
+      .select({ slug: groupsTable.slug })
+      .from(groupsTable)
+      .where(eq(groupsTable.userId, userId));
+    const slugSet = new Set(allSlugs.map((r) => r.slug));
     let suffix = 1;
-    while (index.groups.some((g) => g.id === id)) {
-      id = `${base}-${suffix}`;
-      suffix++;
-    }
-    const meta: GroupMeta = { id, name, createdAt: new Date().toISOString() };
-    index.groups.push(meta);
-    await ensureDir(groupDir(id));
-    await writeJson(groupMetaPath(id), meta);
-    await writeJson(groupsIndexPath(), index);
-    return meta;
-  });
-}
-
-export async function deleteGroup(groupId: string): Promise<void> {
-  return withLock(groupsIndexPath(), async () => {
-    const index = await listGroups();
-    index.groups = index.groups.filter((g) => g.id !== groupId);
-    await writeJson(groupsIndexPath(), index);
-    try {
-      await rm(groupDir(groupId), { recursive: true, force: true });
-    } catch {
-      // directory may not exist
-    }
-  });
-}
-
-export async function getGroup(groupId: string): Promise<GroupMeta | null> {
-  return readJson<GroupMeta>(groupMetaPath(groupId));
-}
-
-export async function listCoins(groupId: string): Promise<CoinFile[]> {
-  const dir = coinsDir(groupId);
-  try {
-    const files = await readdir(dir);
-    const coins: CoinFile[] = [];
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue;
-      const coin = await readJson<CoinFile>(join(dir, file));
-      if (coin) coins.push(coin);
-    }
-    return coins;
-  } catch {
-    return [];
+    while (slugSet.has(`${base}-${suffix}`)) suffix++;
+    slug = `${base}-${suffix}`;
   }
+
+  const [row] = await db.insert(groupsTable).values({ userId, slug, name }).returning();
+  if (!row) throw new Error("Failed to create group");
+  return {
+    id: row.slug,
+    name: row.name,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export async function getCoin(groupId: string, coinId: string): Promise<CoinFile | null> {
-  return readJson<CoinFile>(coinPath(groupId, coinId));
+export async function deleteGroup(userId: string, groupSlug: string): Promise<void> {
+  await db
+    .delete(groupsTable)
+    .where(and(eq(groupsTable.userId, userId), eq(groupsTable.slug, groupSlug)));
 }
 
-export async function upsertCoin(groupId: string, coin: CoinFile): Promise<void> {
-  return withLock(coinPath(groupId, coin.coinId), async () => {
-    await writeJson(coinPath(groupId, coin.coinId), coin);
-  });
+export async function getGroup(userId: string, groupSlug: string): Promise<GroupMeta | null> {
+  const [row] = await db
+    .select()
+    .from(groupsTable)
+    .where(and(eq(groupsTable.userId, userId), eq(groupsTable.slug, groupSlug)))
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.slug,
+    name: row.name,
+    createdAt: row.createdAt.toISOString(),
+  };
 }
 
-export async function deleteCoin(groupId: string, coinId: string): Promise<void> {
-  return withLock(coinPath(groupId, coinId), async () => {
-    try {
-      await rm(coinPath(groupId, coinId));
-    } catch {
-      // file may not exist
-    }
-  });
+export async function listCoins(userId: string, groupSlug: string): Promise<CoinFile[]> {
+  const groupId = await resolveGroupId(userId, groupSlug);
+  if (!groupId) return [];
+
+  const coinRows = await db.select().from(coinsTable).where(eq(coinsTable.groupId, groupId));
+
+  const result: CoinFile[] = [];
+  for (const coinRow of coinRows) {
+    const movRows = await db
+      .select()
+      .from(movementsTable)
+      .where(eq(movementsTable.coinId, coinRow.id))
+      .orderBy(movementsTable.date);
+    result.push({
+      coinId: coinRow.coinId,
+      symbol: coinRow.symbol,
+      name: coinRow.name,
+      movements: movRows.map((m) => ({
+        id: m.id,
+        type: m.type as "buy" | "sell",
+        date: m.date.toISOString(),
+        amount: m.amount,
+        pricePerCoin: m.pricePerCoin,
+        note: m.note,
+      })),
+    });
+  }
+  return result;
+}
+
+export async function getCoin(
+  userId: string,
+  groupSlug: string,
+  coinId: string,
+): Promise<CoinFile | null> {
+  const groupId = await resolveGroupId(userId, groupSlug);
+  if (!groupId) return null;
+
+  const [coinRow] = await db
+    .select()
+    .from(coinsTable)
+    .where(and(eq(coinsTable.groupId, groupId), eq(coinsTable.coinId, coinId)))
+    .limit(1);
+  if (!coinRow) return null;
+
+  const movRows = await db
+    .select()
+    .from(movementsTable)
+    .where(eq(movementsTable.coinId, coinRow.id))
+    .orderBy(movementsTable.date);
+
+  return {
+    coinId: coinRow.coinId,
+    symbol: coinRow.symbol,
+    name: coinRow.name,
+    movements: movRows.map((m) => ({
+      id: m.id,
+      type: m.type as "buy" | "sell",
+      date: m.date.toISOString(),
+      amount: m.amount,
+      pricePerCoin: m.pricePerCoin,
+      note: m.note,
+    })),
+  };
+}
+
+export async function upsertCoin(
+  userId: string,
+  groupSlug: string,
+  coin: Omit<CoinFile, "movements">,
+): Promise<void> {
+  const groupId = await resolveGroupId(userId, groupSlug);
+  if (!groupId) return;
+
+  await db
+    .insert(coinsTable)
+    .values({ groupId, coinId: coin.coinId, symbol: coin.symbol, name: coin.name })
+    .onConflictDoUpdate({
+      target: [coinsTable.groupId, coinsTable.coinId],
+      set: { symbol: coin.symbol, name: coin.name },
+    });
+}
+
+export async function deleteCoin(userId: string, groupSlug: string, coinId: string): Promise<void> {
+  const groupId = await resolveGroupId(userId, groupSlug);
+  if (!groupId) return;
+
+  await db
+    .delete(coinsTable)
+    .where(and(eq(coinsTable.groupId, groupId), eq(coinsTable.coinId, coinId)));
 }
 
 export async function addMovement(
-  groupId: string,
+  userId: string,
+  groupSlug: string,
   coinId: string,
   movement: Movement,
 ): Promise<CoinFile> {
-  return withLock(coinPath(groupId, coinId), async () => {
-    const coin =
-      (await readJson<CoinFile>(coinPath(groupId, coinId))) ??
-      ({
-        coinId,
-        symbol: "",
-        name: "",
-        movements: [],
-      } as CoinFile);
-    coin.movements.push(movement);
-    await writeJson(coinPath(groupId, coinId), coin);
-    return coin;
+  const groupId = await resolveGroupId(userId, groupSlug);
+  if (!groupId) {
+    return { coinId, symbol: "", name: "", movements: [movement] };
+  }
+
+  const [coinRow] = await db
+    .insert(coinsTable)
+    .values({ groupId, coinId, symbol: "", name: "" })
+    .onConflictDoNothing()
+    .returning();
+
+  const coinDbId = coinRow?.id;
+  if (!coinDbId) {
+    const [existing] = await db
+      .select()
+      .from(coinsTable)
+      .where(and(eq(coinsTable.groupId, groupId), eq(coinsTable.coinId, coinId)))
+      .limit(1);
+    if (!existing) {
+      return { coinId, symbol: "", name: "", movements: [movement] };
+    }
+    await db.insert(movementsTable).values({
+      id: movement.id,
+      coinId: existing.id,
+      type: movement.type,
+      date: new Date(movement.date),
+      amount: movement.amount,
+      pricePerCoin: movement.pricePerCoin,
+      note: movement.note,
+    });
+    const movRows = await db
+      .select()
+      .from(movementsTable)
+      .where(eq(movementsTable.coinId, existing.id))
+      .orderBy(movementsTable.date);
+    return {
+      coinId: existing.coinId,
+      symbol: existing.symbol,
+      name: existing.name,
+      movements: movRows.map((m) => ({
+        id: m.id,
+        type: m.type as "buy" | "sell",
+        date: m.date.toISOString(),
+        amount: m.amount,
+        pricePerCoin: m.pricePerCoin,
+        note: m.note,
+      })),
+    };
+  }
+
+  await db.insert(movementsTable).values({
+    id: movement.id,
+    coinId: coinDbId,
+    type: movement.type,
+    date: new Date(movement.date),
+    amount: movement.amount,
+    pricePerCoin: movement.pricePerCoin,
+    note: movement.note,
   });
+
+  return {
+    coinId,
+    symbol: "",
+    name: "",
+    movements: [movement],
+  };
 }
 
 export async function deleteMovement(
-  groupId: string,
+  userId: string,
+  groupSlug: string,
   coinId: string,
   movementId: string,
 ): Promise<CoinFile | null> {
-  return withLock(coinPath(groupId, coinId), async () => {
-    const coin = await readJson<CoinFile>(coinPath(groupId, coinId));
-    if (!coin) return null;
-    coin.movements = coin.movements.filter((m) => m.id !== movementId);
-    await writeJson(coinPath(groupId, coinId), coin);
-    return coin;
-  });
+  const coin = await getCoin(userId, groupSlug, coinId);
+  if (!coin) return null;
+
+  await db.delete(movementsTable).where(eq(movementsTable.id, movementId));
+
+  const updated = await getCoin(userId, groupSlug, coinId);
+  return updated;
 }
