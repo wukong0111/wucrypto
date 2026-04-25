@@ -8,6 +8,7 @@ import authRoute from "./auth";
 import coinsRoute from "./coins";
 import groupsRoute from "./groups";
 import movementsRoute from "./movements";
+import settingsRoute from "./settings";
 
 type AuthVars = { Variables: { user: { id: string; username: string } } };
 
@@ -25,6 +26,7 @@ function createApp(): Hono {
   protectedRoutes.route("/", groupsRoute);
   protectedRoutes.route("/", coinsRoute);
   protectedRoutes.route("/", movementsRoute);
+  protectedRoutes.route("/", settingsRoute);
   app.route("/", protectedRoutes);
   return app;
 }
@@ -417,5 +419,125 @@ describe("auth", () => {
     });
     expect(res.status).toBe(302);
     expect(res.headers.get("Location")).toBe("/login");
+  });
+});
+
+describe("settings", () => {
+  test("GET /settings renders settings page", async () => {
+    const app = createApp();
+    const res = await app.request("/settings", { headers: withAuth() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Change Username");
+    expect(html).toContain("Change Password");
+  });
+
+  test("GET /settings redirects to login when not authenticated", async () => {
+    const app = createApp();
+    const res = await app.request("/settings");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/login");
+  });
+
+  test("POST /settings/username updates username", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/username", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "username=newusername",
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("newusername");
+    expect(html).toContain("Username updated!");
+  });
+
+  test("POST /settings/username rejects short username", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/username", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "username=ab",
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("3-50 characters");
+  });
+
+  test("POST /settings/username rejects taken username", async () => {
+    const app = createApp();
+    const res = await app.request("/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "username=otheruser&password=password123",
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+
+    const res2 = await app.request("/settings/username", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "username=otheruser",
+    });
+    expect(res2.status).toBe(400);
+    const html = await res2.text();
+    expect(html).toContain("already taken");
+  });
+
+  test("POST /settings/password invalidates sessions and redirects", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/password", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "currentPassword=testpass123&newPassword=newpassword123",
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("HX-Redirect")).toBe("/login");
+
+    const res2 = await app.request("/", { headers: withAuth() });
+    expect(res2.status).toBe(302);
+    expect(res2.headers.get("Location")).toBe("/login");
+  });
+
+  test("POST /settings/password rejects wrong current password", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/password", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "currentPassword=wrongpassword&newPassword=newpassword123",
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("Current password is incorrect");
+  });
+
+  test("POST /settings/password rejects short new password", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/password", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "currentPassword=testpass123&newPassword=short",
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("at least 8 characters");
   });
 });

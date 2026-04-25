@@ -13,7 +13,9 @@ export const Navbar: FC<NavbarProps> = ({ username }) => (
       </a>
       {username && (
         <div class="flex items-center gap-4 text-sm">
-          <span class="text-gray-400">{username}</span>
+          <a href="/settings" class="text-gray-400 hover:text-white transition-colors">
+            {username}
+          </a>
           <form action="/logout" method="post" class="inline">
             <button type="submit" class="text-gray-500 hover:text-white transition-colors">
               Logout

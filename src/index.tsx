@@ -5,6 +5,7 @@ import authRoutes from "./routes/auth";
 import coinRoutes from "./routes/coins";
 import groups from "./routes/groups";
 import movementRoutes from "./routes/movements";
+import settingsRoutes from "./routes/settings";
 
 const app = new Hono();
 
@@ -20,6 +21,7 @@ protectedRoutes.use("*", authMiddleware);
 protectedRoutes.route("/", groups);
 protectedRoutes.route("/", coinRoutes);
 protectedRoutes.route("/", movementRoutes);
+protectedRoutes.route("/", settingsRoutes);
 app.route("/", protectedRoutes);
 
 const port = Number(Bun.env["PORT"]) || 3000;
