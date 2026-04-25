@@ -60,7 +60,14 @@ if (!slugMatch) {
 const coinSlug = slugMatch[1]!;
 
 const txRe = /data-portfolio-coin-transaction-data="([^"]+)"/g;
-const rawMovements: Array<{ id: string; type: "buy" | "sell"; date: string; amount: number; pricePerCoin: number; note: string }> = [];
+const rawMovements: Array<{
+  id: string;
+  type: "buy" | "sell";
+  date: string;
+  amount: number;
+  pricePerCoin: number;
+  note: string;
+}> = [];
 
 for (const m of html.matchAll(txRe)) {
   const decoded = decodeHtmlEntities(m[1]!);
@@ -108,7 +115,10 @@ const db = drizzle(client, { schema });
 let coinDbId: string;
 
 if (coinUuid) {
-  const [found] = await db.select({ id: schema.coins.id }).from(schema.coins).where(eq(schema.coins.id, coinUuid));
+  const [found] = await db
+    .select({ id: schema.coins.id })
+    .from(schema.coins)
+    .where(eq(schema.coins.id, coinUuid));
   if (!found) {
     console.error(`Coin not found with id: ${coinUuid}`);
     await client.end();
@@ -148,7 +158,11 @@ if (coinUuid) {
 
 // Deduplicate against existing movements in DB
 const existing = await db
-  .select({ date: schema.movements.date, amount: schema.movements.amount, pricePerCoin: schema.movements.pricePerCoin })
+  .select({
+    date: schema.movements.date,
+    amount: schema.movements.amount,
+    pricePerCoin: schema.movements.pricePerCoin,
+  })
   .from(schema.movements)
   .where(eq(schema.movements.coinId, coinDbId));
 
