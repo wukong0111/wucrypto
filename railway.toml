@@ -2,5 +2,5 @@
 buildCommand = "bun run build:css"
 
 [deploy]
-preDeployCommand = ["bunx drizzle-kit migrate"]
+preDeployCommand = "bun scripts/migrate.ts"
 startCommand = "bun src/index.tsx"
