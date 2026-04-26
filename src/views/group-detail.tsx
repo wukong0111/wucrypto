@@ -153,7 +153,7 @@ const GroupDetailView: FC<GroupDetailViewProps> = ({ group, coins, derived, summ
               </div>
               <ul
                 id="search-results"
-                class="absolute top-full left-0 w-full bg-gray-800 border border-gray-700 rounded-b-lg mt-0.5 z-10 max-h-48 overflow-auto"
+                class="absolute top-full left-0 w-full bg-gray-800 border border-gray-700 rounded-b-lg mt-0.5 z-10 max-h-48 overflow-auto empty:hidden"
               />
             </div>
             <button

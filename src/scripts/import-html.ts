@@ -57,7 +57,7 @@ if (!slugMatch) {
   console.error("Error: no data-coin-slug found in HTML");
   process.exit(1);
 }
-const coinSlug = slugMatch[1]!;
+const coinSlug = slugMatch[1] ?? "";
 
 const txRe = /data-portfolio-coin-transaction-data="([^"]+)"/g;
 const rawMovements: Array<{
@@ -70,7 +70,7 @@ const rawMovements: Array<{
 }> = [];
 
 for (const m of html.matchAll(txRe)) {
-  const decoded = decodeHtmlEntities(m[1]!);
+  const decoded = decodeHtmlEntities(m[1] ?? "");
   const tx = JSON.parse(decoded) as GeckoTx;
   if (
     tx.transaction_type !== "buy" &&
@@ -129,7 +129,7 @@ if (coinUuid) {
   const [user] = await db
     .select({ id: schema.users.id })
     .from(schema.users)
-    .where(eq(schema.users.username, username!));
+    .where(eq(schema.users.username, username ?? ""));
   if (!user) {
     console.error(`User not found: ${username}`);
     await client.end();
@@ -138,7 +138,7 @@ if (coinUuid) {
   const [group] = await db
     .select({ id: schema.groups.id })
     .from(schema.groups)
-    .where(and(eq(schema.groups.userId, user.id), eq(schema.groups.slug, groupSlug!)));
+    .where(and(eq(schema.groups.userId, user.id), eq(schema.groups.slug, groupSlug ?? "")));
   if (!group) {
     console.error(`Group not found: ${groupSlug} for user ${username}`);
     await client.end();
