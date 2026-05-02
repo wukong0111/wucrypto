@@ -52,7 +52,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
         hx-target="#movements-body"
         hx-swap="afterbegin"
         data-err="add-movement-error"
-        class="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end"
+        class="grid grid-cols-2 sm:grid-cols-7 gap-2 items-end"
       >
         <div>
           <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wide" for="mov-type">
@@ -93,6 +93,17 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
           />
         </div>
         <div>
+          <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wide" for="mov-total">
+            Total (USD)
+          </label>
+          <input
+            id="mov-total"
+            type="number"
+            step="any"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+        <div>
           <label class="block text-xs text-gray-500 mb-1 uppercase tracking-wide" for="mov-price">
             Price/Coin (USD)
           </label>
@@ -124,6 +135,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
           Add
         </button>
       </form>
+      <script src="/movement-calc.js" />
       <FormError id="add-movement-error" />
     </div>
 
