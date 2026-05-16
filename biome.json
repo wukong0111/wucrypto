@@ -2,7 +2,13 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "organizeImports": { "enabled": true },
   "files": {
-    "ignore": ["public/htmx.min.js", "public/movement-calc.js", "public/app.css", "drizzle/"]
+    "ignore": [
+      "public/htmx.min.js",
+      "public/movement-calc.js",
+      "public/sort-coins.js",
+      "public/app.css",
+      "drizzle/"
+    ]
   },
   "formatter": {
     "enabled": true,

@@ -13,6 +13,7 @@ app.use("/favicon.svg", serveStatic({ root: "./public" }));
 app.use("/app.css", serveStatic({ root: "./public" }));
 app.use("/htmx.min.js", serveStatic({ root: "./public" }));
 app.use("/movement-calc.js", serveStatic({ root: "./public" }));
+app.use("/sort-coins.js", serveStatic({ root: "./public" }));
 
 app.route("/", authRoutes);
 
