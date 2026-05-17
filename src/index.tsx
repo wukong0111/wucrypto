@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
+import { apiKeyMiddleware } from "./middleware/api-key";
 import { authMiddleware } from "./middleware/auth";
 import authRoutes from "./routes/auth";
 import coinRoutes from "./routes/coins";
@@ -20,6 +21,7 @@ app.route("/", authRoutes);
 type AuthVars = { Variables: { user: { id: string; username: string } } };
 const protectedRoutes = new Hono<AuthVars>();
 protectedRoutes.use("*", authMiddleware);
+protectedRoutes.use("*", apiKeyMiddleware);
 protectedRoutes.route("/", groups);
 protectedRoutes.route("/", coinRoutes);
 protectedRoutes.route("/", movementRoutes);

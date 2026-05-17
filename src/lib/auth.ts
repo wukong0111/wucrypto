@@ -19,11 +19,13 @@ export async function createSession(userId: string): Promise<string> {
 
 export async function validateSession(
   token: string,
-): Promise<{ id: string; username: string } | null> {
+): Promise<{ id: string; username: string; coingeckoApiKey: string | null } | null> {
   const [session] = await db.select().from(sessions).where(eq(sessions.token, token)).limit(1);
   if (!session || new Date(session.expiresAt) < new Date()) return null;
   const [user] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
-  return user ? { id: user.id, username: user.username } : null;
+  return user
+    ? { id: user.id, username: user.username, coingeckoApiKey: user.coingeckoApiKey }
+    : null;
 }
 
 export async function deleteSession(token: string): Promise<void> {

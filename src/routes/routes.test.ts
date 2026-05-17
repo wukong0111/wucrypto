@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { Hono } from "hono";
 import { createSession } from "../lib/auth";
 import { clearCache } from "../lib/coingecko";
-import { createTestUser, truncateAll } from "../lib/test-helpers";
+import { createTestUser, createTestUserWithoutApiKey, truncateAll } from "../lib/test-helpers";
+import { apiKeyMiddleware } from "../middleware/api-key";
 import { authMiddleware } from "../middleware/auth";
 import authRoute from "./auth";
 import coinsRoute from "./coins";
@@ -10,7 +11,9 @@ import groupsRoute from "./groups";
 import movementsRoute from "./movements";
 import settingsRoute from "./settings";
 
-type AuthVars = { Variables: { user: { id: string; username: string } } };
+type AuthVars = {
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
+};
 
 let userId: string;
 let username: string;
@@ -23,6 +26,7 @@ function createApp(): Hono {
   app.route("/", authRoute);
   const protectedRoutes = new Hono<AuthVars>();
   protectedRoutes.use("*", authMiddleware);
+  protectedRoutes.use("*", apiKeyMiddleware);
   protectedRoutes.route("/", groupsRoute);
   protectedRoutes.route("/", coinsRoute);
   protectedRoutes.route("/", movementsRoute);
@@ -539,5 +543,121 @@ describe("settings", () => {
     expect(res.status).toBe(400);
     const html = await res.text();
     expect(html).toContain("at least 8 characters");
+  });
+
+  test("GET /settings shows missing key error banner", async () => {
+    const app = createApp();
+    const res = await app.request("/settings?error=missing_key", { headers: withAuth() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("API Key required");
+  });
+
+  test("POST /settings/coingecko-key saves valid key", async () => {
+    // @ts-expect-error mock
+    globalThis.fetch = mock(() =>
+      Promise.resolve(new Response(JSON.stringify({}), { status: 200 })),
+    );
+    const app = createApp();
+    const res = await app.request("/settings/coingecko-key", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "apiKey=valid-key-123",
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("API key updated");
+  });
+
+  test("POST /settings/coingecko-key rejects invalid key", async () => {
+    // @ts-expect-error mock
+    globalThis.fetch = mock(() => Promise.resolve(new Response("unauthorized", { status: 401 })));
+    const app = createApp();
+    const res = await app.request("/settings/coingecko-key", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+        "HX-Request": "true",
+      },
+      body: "apiKey=invalid-key",
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("Invalid API key");
+  });
+
+  test("POST /settings/coingecko-key clears key when empty", async () => {
+    const app = createApp();
+    const res = await app.request("/settings/coingecko-key", {
+      method: "POST",
+      headers: {
+        ...withAuth(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "apiKey=",
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Not configured");
+  });
+});
+
+describe("api key enforcement", () => {
+  test("redirects to settings when api key is missing on group detail", async () => {
+    await truncateAll();
+    const user = await createTestUserWithoutApiKey();
+    const token = await createSession(user.id);
+
+    const app = createApp();
+    const res = await app.request("/groups/test", {
+      headers: { Cookie: `session_token=${token}` },
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/settings?error=missing_key");
+  });
+
+  test("redirects to settings when api key is missing on coin detail", async () => {
+    await truncateAll();
+    const user = await createTestUserWithoutApiKey();
+    const token = await createSession(user.id);
+
+    const app = createApp();
+    const res = await app.request("/groups/test/coins/bitcoin", {
+      headers: { Cookie: `session_token=${token}` },
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/settings?error=missing_key");
+  });
+
+  test("returns inline error for HTMX search without api key", async () => {
+    await truncateAll();
+    const user = await createTestUserWithoutApiKey();
+    const token = await createSession(user.id);
+
+    const app = createApp();
+    const res = await app.request("/api/coins/search?q=bit", {
+      headers: { Cookie: `session_token=${token}`, "HX-Request": "true" },
+    });
+    expect(res.status).toBe(403);
+    const html = await res.text();
+    expect(html).toContain("Configure your CoinGecko API key");
+  });
+
+  test("exempt routes work without api key", async () => {
+    await truncateAll();
+    const user = await createTestUserWithoutApiKey();
+    const token = await createSession(user.id);
+
+    const app = createApp();
+    const res = await app.request("/", {
+      headers: { Cookie: `session_token=${token}` },
+    });
+    expect(res.status).toBe(200);
   });
 });

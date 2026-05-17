@@ -8,6 +8,13 @@
       "when": 1777123790113,
       "tag": "0000_zippy_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778976802070,
+      "tag": "0001_add_coingecko_api_key",
+      "breakpoints": true
     }
   ]
 }

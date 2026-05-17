@@ -6,7 +6,7 @@ import CoinDetailView, { MovementRow } from "../views/coin-detail";
 import Layout from "../views/layout";
 
 const movements = new Hono<{
-  Variables: { user: { id: string; username: string } };
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 }>();
 
 movements.get("/groups/:groupId/coins/:coinId", async (c) => {
@@ -18,7 +18,10 @@ movements.get("/groups/:groupId/coins/:coinId", async (c) => {
   const coin = await getCoin(user.id, groupId, coinId);
   if (!coin) return c.text("Coin not found", 404);
 
-  const prices = await fetchPrices([coinId]);
+  const apiKey = user.coingeckoApiKey;
+  if (!apiKey) return c.redirect("/settings?error=missing_key");
+
+  const prices = await fetchPrices([coinId], apiKey);
   const price = prices.get(coinId) ?? null;
   const derived = calcPnl(coin.movements, price);
 

@@ -17,14 +17,24 @@ function getCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   return data;
 }
 
-function headers(): Record<string, string> {
-  const key = Bun.env["COINGECKO_API_KEY"];
-  const h: Record<string, string> = {};
-  if (key) h["x-cg-demo-api-key"] = key;
-  return h;
+function headers(apiKey: string): Record<string, string> {
+  return { "x-cg-demo-api-key": apiKey };
 }
 
-export async function fetchPrices(coinIds: string[]): Promise<Map<string, number | null>> {
+export async function validateApiKey(apiKey: string): Promise<boolean> {
+  try {
+    const url = `${BASE_URL}/ping`;
+    const res = await fetch(url, { headers: headers(apiKey) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchPrices(
+  coinIds: string[],
+  apiKey: string,
+): Promise<Map<string, number | null>> {
   if (coinIds.length === 0) return new Map();
 
   const sorted = [...coinIds].sort();
@@ -36,7 +46,7 @@ export async function fetchPrices(coinIds: string[]): Promise<Map<string, number
 
     try {
       const url = `${BASE_URL}/simple/price?ids=${sorted.join(",")}&vs_currencies=usd`;
-      const res = await fetch(url, { headers: headers() });
+      const res = await fetch(url, { headers: headers(apiKey) });
       if (!res.ok) return result;
       const json = (await res.json()) as Record<string, { usd?: number }>;
       for (const [id, price] of Object.entries(json)) {
@@ -51,12 +61,13 @@ export async function fetchPrices(coinIds: string[]): Promise<Map<string, number
 
 export async function searchCoins(
   query: string,
+  apiKey: string,
 ): Promise<Array<{ id: string; symbol: string; name: string }>> {
   if (!query.trim()) return [];
 
   try {
     const url = `${BASE_URL}/search?query=${encodeURIComponent(query)}`;
-    const res = await fetch(url, { headers: headers() });
+    const res = await fetch(url, { headers: headers(apiKey) });
     if (!res.ok) return [];
     const json = (await res.json()) as {
       coins?: Array<{ id: string; symbol: string; name: string }>;

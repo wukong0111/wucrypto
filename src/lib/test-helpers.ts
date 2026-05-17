@@ -17,7 +17,18 @@ export async function createTestUser() {
   const hash = await Bun.password.hash("testpass123", { algorithm: "bcrypt" });
   const [user] = await db
     .insert(schema.users)
-    .values({ username: "testuser", passwordHash: hash })
+    .values({ username: "testuser", passwordHash: hash, coingeckoApiKey: "test-api-key" })
+    .returning();
+  if (!user) throw new Error("Failed to create test user");
+  return user;
+}
+
+export async function createTestUserWithoutApiKey() {
+  const { db } = await import("./db");
+  const hash = await Bun.password.hash("testpass123", { algorithm: "bcrypt" });
+  const [user] = await db
+    .insert(schema.users)
+    .values({ username: "testuser-nokey", passwordHash: hash })
     .returning();
   if (!user) throw new Error("Failed to create test user");
   return user;

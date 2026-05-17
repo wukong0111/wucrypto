@@ -4,7 +4,7 @@ import { createMiddleware } from "hono/factory";
 import { validateSession } from "../lib/auth";
 
 type AuthEnv = {
-  Variables: { user: { id: string; username: string } };
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 };
 
 export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {

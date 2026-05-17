@@ -2,18 +2,27 @@ import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteCookie } from "hono/cookie";
 import { deleteAllUserSessions, hashPassword, verifyPassword } from "../lib/auth";
+import { validateApiKey } from "../lib/coingecko";
 import { db } from "../lib/db";
 import { users } from "../lib/db/schema";
 import { FormError } from "../views/components/FormError";
 import SettingsView from "../views/settings";
 
 const settings = new Hono<{
-  Variables: { user: { id: string; username: string } };
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 }>();
 
 settings.get("/settings", async (c) => {
   const user = c.get("user");
-  return c.html(<SettingsView username={user.username} />);
+  const error = c.req.query("error");
+  return c.html(
+    <SettingsView
+      username={user.username}
+      coingeckoApiKey={user.coingeckoApiKey}
+      missingKeyError={error === "missing_key"}
+      invalidKeyError={error === "invalid_key"}
+    />,
+  );
 });
 
 settings.post("/settings/username", async (c) => {
@@ -121,6 +130,132 @@ settings.post("/settings/password", async (c) => {
 
   c.header("HX-Redirect", "/login");
   return c.text("", 200);
+});
+
+settings.post("/settings/coingecko-key", async (c) => {
+  const user = c.get("user");
+  const body = await c.req.parseBody();
+  const apiKey = String(body["apiKey"] ?? "").trim();
+
+  if (!apiKey) {
+    await db.update(users).set({ coingeckoApiKey: null }).where(eq(users.id, user.id));
+    return c.html(
+      <div id="coingecko-section" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+        <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-4">
+          CoinGecko API Key
+        </h2>
+        <p class="text-sm text-gray-400 mb-3">
+          Current: <span class="text-white">Not configured</span>
+        </p>
+        <form
+          hx-post="/settings/coingecko-key"
+          hx-target="#coingecko-section"
+          hx-swap="outerHTML"
+          data-err="coingecko-key-error"
+          class="flex gap-2 items-end"
+        >
+          <div class="flex-1">
+            <label
+              for="coingecko-key"
+              class="block text-xs text-gray-500 mb-1 uppercase tracking-wide"
+            >
+              API Key
+            </label>
+            <input
+              id="coingecko-key"
+              type="text"
+              name="apiKey"
+              placeholder="Enter your CoinGecko API key"
+              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+            />
+          </div>
+          <button
+            type="submit"
+            class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            Save
+          </button>
+        </form>
+        <FormError id="coingecko-key-error" />
+        <p class="text-xs text-gray-500 mt-3">
+          Get your free API key from{" "}
+          <a
+            href="https://www.coingecko.com/en/developers/dashboard"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-400 hover:text-blue-300 underline"
+          >
+            CoinGecko Developer Dashboard
+          </a>
+          .
+        </p>
+      </div>,
+    );
+  }
+
+  const isValid = await validateApiKey(apiKey);
+  if (!isValid) {
+    c.header("HX-Retarget", "#coingecko-key-error");
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(<span>Invalid API key. Please verify your key and try again.</span>, 400);
+  }
+
+  await db.update(users).set({ coingeckoApiKey: apiKey }).where(eq(users.id, user.id));
+
+  return c.html(
+    <div id="coingecko-section" class="bg-gray-900 border border-gray-800 rounded-xl p-4">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-4">
+        CoinGecko API Key
+      </h2>
+      <p class="text-sm text-gray-400 mb-3">
+        Current: <span class="text-white">••••••••••••</span>
+      </p>
+      <form
+        hx-post="/settings/coingecko-key"
+        hx-target="#coingecko-section"
+        hx-swap="outerHTML"
+        data-err="coingecko-key-error"
+        class="flex gap-2 items-end"
+      >
+        <div class="flex-1">
+          <label
+            for="coingecko-key"
+            class="block text-xs text-gray-500 mb-1 uppercase tracking-wide"
+          >
+            API Key
+          </label>
+          <input
+            id="coingecko-key"
+            type="text"
+            name="apiKey"
+            placeholder="Enter new key to update"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+        <button
+          type="submit"
+          class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          Update
+        </button>
+      </form>
+      <div id="coingecko-key-error" class="text-green-400 text-sm mt-2 min-h-[1.25rem]">
+        API key updated!
+      </div>
+      <p class="text-xs text-gray-500 mt-3">
+        Get your free API key from{" "}
+        <a
+          href="https://www.coingecko.com/en/developers/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-blue-400 hover:text-blue-300 underline"
+        >
+          CoinGecko Developer Dashboard
+        </a>
+        .
+      </p>
+    </div>,
+  );
 });
 
 export default settings;

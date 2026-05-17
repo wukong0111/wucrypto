@@ -6,7 +6,7 @@ import GroupDetailView, { CoinRow } from "../views/group-detail";
 import Layout from "../views/layout";
 
 const coins = new Hono<{
-  Variables: { user: { id: string; username: string } };
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 }>();
 
 coins.get("/groups/:groupId", async (c) => {
@@ -15,9 +15,12 @@ coins.get("/groups/:groupId", async (c) => {
   const group = await getGroup(user.id, groupId);
   if (!group) return c.text("Group not found", 404);
 
+  const apiKey = user.coingeckoApiKey;
+  if (!apiKey) return c.redirect("/settings?error=missing_key");
+
   const coinList = await listCoins(user.id, groupId);
   const coinIds = coinList.map((coin) => coin.coinId);
-  const prices = await fetchPrices(coinIds);
+  const prices = await fetchPrices(coinIds, apiKey);
 
   const derived = new Map<string, ReturnType<typeof calcPnl>>();
   const summaryInput: Array<{
@@ -61,9 +64,12 @@ coins.post("/groups/:groupId/coins", async (c) => {
     return c.html(<span>Select a coin first</span>, 400);
   }
 
+  const apiKey = user.coingeckoApiKey;
+  if (!apiKey) return c.redirect("/settings?error=missing_key");
+
   const coin = { coinId, symbol, name, movements: [] };
   await upsertCoin(user.id, groupId, coin);
-  const prices = await fetchPrices([coinId]);
+  const prices = await fetchPrices([coinId], apiKey);
   const price = prices.get(coinId) ?? null;
   const derived = calcPnl([], price);
 
@@ -81,7 +87,16 @@ coins.get("/api/coins/search", async (c) => {
   const q = c.req.query("q") ?? "";
   if (!q.trim()) return c.html("", 200);
 
-  const results = await searchCoins(q);
+  const apiKey = c.get("user").coingeckoApiKey;
+  if (!apiKey) {
+    return c.html(
+      <li class="px-3 py-3 text-red-400 text-sm text-center cursor-default">
+        Configure your CoinGecko API key in Settings to search coins
+      </li>,
+    );
+  }
+
+  const results = await searchCoins(q, apiKey);
   if (results.length === 0) {
     return c.html(
       <li class="px-3 py-3 text-gray-500 text-sm text-center cursor-default">No results found</li>,

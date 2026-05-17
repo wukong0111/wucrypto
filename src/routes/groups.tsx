@@ -4,7 +4,7 @@ import HomeView, { GroupItem } from "../views/home";
 import Layout from "../views/layout";
 
 const groups = new Hono<{
-  Variables: { user: { id: string; username: string } };
+  Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 }>();
 
 groups.get("/", async (c) => {

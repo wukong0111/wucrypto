@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "coingecko_api_key" text;
