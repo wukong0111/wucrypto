@@ -6,3 +6,4 @@ public/app.css
 *.txt
 .idea/
 .opencode/
+.pi/
