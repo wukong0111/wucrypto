@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { calcGroupSummary, calcPnl } from "../lib/calc";
-import { fetchPrices, searchCoins } from "../lib/coingecko";
-import { deleteCoin, getGroup, listCoins, upsertCoin } from "../lib/storage";
+import { fetchCoinMetadata, fetchPrices, searchCoins } from "../lib/coingecko";
+import { deleteCoin, getCoin, getGroup, listCoins, upsertCoin } from "../lib/storage";
 import GroupDetailView, { CoinRow } from "../views/group-detail";
 import Layout from "../views/layout";
 
@@ -20,7 +20,10 @@ coins.get("/groups/:groupId", async (c) => {
 
   const coinList = await listCoins(user.id, groupId);
   const coinIds = coinList.map((coin) => coin.coinId);
-  const prices = await fetchPrices(coinIds, apiKey);
+  const [prices, metadata] = await Promise.all([
+    fetchPrices(coinIds, apiKey),
+    fetchCoinMetadata(coinIds, apiKey),
+  ]);
 
   const derived = new Map<string, ReturnType<typeof calcPnl>>();
   const summaryInput: Array<{
@@ -35,6 +38,23 @@ coins.get("/groups/:groupId", async (c) => {
     summaryInput.push({ movements: coin.movements, priceUsd: price });
   }
 
+  const discrepancies = coinList
+    .map((coin) => {
+      const live = metadata.get(coin.coinId);
+      if (!live) return null;
+      const symbolChanged = coin.symbol.toLowerCase() !== live.symbol.toLowerCase();
+      const nameChanged = coin.name.toLowerCase() !== live.name.toLowerCase();
+      if (!symbolChanged && !nameChanged) return null;
+      return {
+        coinId: coin.coinId,
+        symbol: coin.symbol,
+        name: coin.name,
+        liveSymbol: live.symbol,
+        liveName: live.name,
+      };
+    })
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+
   const summary = calcGroupSummary(summaryInput);
 
   return c.html(
@@ -45,6 +65,7 @@ coins.get("/groups/:groupId", async (c) => {
         derived={derived}
         summary={summary}
         prices={prices}
+        discrepancies={discrepancies}
       />
     </Layout>,
   );
@@ -81,6 +102,48 @@ coins.delete("/groups/:groupId/coins/:coinId", async (c) => {
   const { groupId, coinId } = c.req.param();
   await deleteCoin(user.id, groupId, coinId);
   return c.text("", 200);
+});
+
+coins.put("/groups/:groupId/coins/:coinId", async (c) => {
+  const user = c.get("user");
+  const { groupId, coinId } = c.req.param();
+  const apiKey = user.coingeckoApiKey;
+  if (!apiKey) return c.redirect("/settings?error=missing_key");
+
+  const coin = await getCoin(user.id, groupId, coinId);
+  if (!coin) {
+    c.header("HX-Retarget", `#coin-meta-alert-${coinId}`);
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(<span class="text-red-400 text-sm">Coin not found.</span>, 404);
+  }
+
+  const metadata = await fetchCoinMetadata([coinId], apiKey);
+  const live = metadata.get(coinId);
+  if (!live) {
+    c.header("HX-Retarget", `#coin-meta-alert-${coinId}`);
+    c.header("HX-Reswap", "innerHTML");
+    return c.html(
+      <span class="text-red-400 text-sm">Unable to fetch current CoinGecko metadata.</span>,
+      400,
+    );
+  }
+
+  await upsertCoin(user.id, groupId, { coinId, symbol: live.symbol, name: live.name });
+
+  const updatedCoin = await getCoin(user.id, groupId, coinId);
+  if (!updatedCoin) {
+    return c.html(<span class="text-red-400 text-sm">Coin update failed.</span>, 500);
+  }
+
+  const prices = await fetchPrices([coinId], apiKey);
+  const derived = calcPnl(updatedCoin.movements, prices.get(coinId) ?? null);
+
+  return c.html(
+    <>
+      <div id={`coin-meta-alert-${coinId}`} hidden />
+      <CoinRow coin={updatedCoin} derived={derived} groupId={groupId} hx-swap-oob="true" />
+    </>,
+  );
 });
 
 coins.get("/api/coins/search", async (c) => {

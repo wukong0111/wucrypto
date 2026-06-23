@@ -42,15 +42,10 @@ beforeEach(async () => {
   username = user.username;
   sessionToken = await createSession(userId);
   clearCache();
-  // @ts-expect-error Bun's fetch type has extra properties
-  globalThis.fetch = mock(() =>
-    Promise.resolve(
-      new Response(JSON.stringify({ bitcoin: { usd: 50000 }, ethereum: { usd: 3000 } }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
-  );
+  mockCoinGeckoFetch({ bitcoin: { usd: 50000 }, ethereum: { usd: 3000 } }, [
+    { id: "bitcoin", symbol: "btc", name: "Bitcoin" },
+    { id: "ethereum", symbol: "eth", name: "Ethereum" },
+  ]);
 });
 
 afterEach(() => {
@@ -59,6 +54,32 @@ afterEach(() => {
 
 function withAuth(): { Cookie: string } {
   return { Cookie: `session_token=${sessionToken}` };
+}
+
+function mockCoinGeckoFetch(
+  prices: Record<string, { usd: number }>,
+  coinList: Array<{ id: string; symbol: string; name: string }>,
+): void {
+  // @ts-expect-error Bun's fetch type has extra properties that mock doesn't provide
+  globalThis.fetch = mock((url: string) => {
+    if (url.includes("/simple/price")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(prices), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+    if (url.includes("/coins/list")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(coinList), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }
+    return Promise.resolve(new Response("not found", { status: 404 }));
+  });
 }
 
 describe("GET / (home)", () => {
@@ -148,6 +169,138 @@ describe("GET /groups/:groupId", () => {
     const app = createApp();
     const res = await app.request("/groups/nope", { headers: withAuth() });
     expect(res.status).toBe(404);
+  });
+
+  test("shows update banner when CoinGecko metadata changed", async () => {
+    mockCoinGeckoFetch({ "the-open-network": { usd: 5 } }, [
+      { id: "the-open-network", symbol: "gram", name: "Gram (prev. Toncoin)" },
+    ]);
+    const app = createApp();
+    await app.request("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "name=Test",
+    });
+    await app.request("/groups/test/coins", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "coinId=the-open-network&symbol=TON&name=Toncoin",
+    });
+    const res = await app.request("/groups/test", { headers: withAuth() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Toncoin (TON)");
+    expect(html).toContain("Gram (prev. Toncoin) (GRAM)");
+    expect(html).toContain("coin-meta-alert-the-open-network");
+    expect(html).toContain('hx-put="/groups/test/coins/the-open-network"');
+  });
+
+  test("does not show banner when metadata matches", async () => {
+    const app = createApp();
+    await app.request("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "name=Test",
+    });
+    await app.request("/groups/test/coins", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "coinId=bitcoin&symbol=BTC&name=Bitcoin",
+    });
+    const res = await app.request("/groups/test", { headers: withAuth() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain("coin-meta-alert");
+  });
+
+  test("renders group detail when metadata fetch fails", async () => {
+    // @ts-expect-error same as above
+    globalThis.fetch = mock((url: string) => {
+      if (url.includes("/simple/price")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ bitcoin: { usd: 50000 } }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(new Response("error", { status: 500 }));
+    });
+    const app = createApp();
+    await app.request("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "name=Test",
+    });
+    await app.request("/groups/test/coins", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "coinId=bitcoin&symbol=BTC&name=Bitcoin",
+    });
+    const res = await app.request("/groups/test", { headers: withAuth() });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Bitcoin");
+    expect(html).not.toContain("coin-meta-alert");
+  });
+});
+
+describe("PUT /groups/:groupId/coins/:coinId", () => {
+  test("updates stored symbol and name", async () => {
+    mockCoinGeckoFetch({ "the-open-network": { usd: 5 } }, [
+      { id: "the-open-network", symbol: "gram", name: "Gram (prev. Toncoin)" },
+    ]);
+    const app = createApp();
+    await app.request("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "name=Test",
+    });
+    await app.request("/groups/test/coins", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "coinId=the-open-network&symbol=TON&name=Toncoin",
+    });
+    const res = await app.request("/groups/test/coins/the-open-network", {
+      method: "PUT",
+      headers: withAuth(),
+    });
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('id="coin-meta-alert-the-open-network" hidden');
+    expect(html).toContain("Gram (prev. Toncoin)");
+    expect(html).toContain("GRAM");
+
+    const detailRes = await app.request("/groups/test/coins/the-open-network", {
+      headers: withAuth(),
+    });
+    const detailHtml = await detailRes.text();
+    expect(detailHtml).toContain("Gram (prev. Toncoin)");
+    expect(detailHtml).toContain("GRAM");
+    expect(detailHtml).not.toContain(">TON<");
+  });
+
+  test("returns inline error when live metadata unavailable", async () => {
+    // @ts-expect-error same as above
+    globalThis.fetch = mock(() => Promise.resolve(new Response("error", { status: 500 })));
+    const app = createApp();
+    await app.request("/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "name=Test",
+    });
+    await app.request("/groups/test/coins", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", ...withAuth() },
+      body: "coinId=bitcoin&symbol=BTC&name=Bitcoin",
+    });
+    const res = await app.request("/groups/test/coins/bitcoin", {
+      method: "PUT",
+      headers: withAuth(),
+    });
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain("Unable to fetch current CoinGecko metadata");
   });
 });
 

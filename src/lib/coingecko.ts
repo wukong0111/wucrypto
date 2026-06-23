@@ -1,19 +1,20 @@
 const TTL_MS = 60_000;
+const METADATA_TTL_MS = 300_000;
 const BASE_URL = "https://api.coingecko.com/api/v3";
 
-const cache = new Map<string, { ts: number; data: Promise<unknown> }>();
+const cache = new Map<string, { ts: number; ttl: number; data: Promise<unknown> }>();
 
 export function clearCache(): void {
   cache.clear();
 }
 
-function getCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+function getCached<T>(key: string, fetcher: () => Promise<T>, ttl = TTL_MS): Promise<T> {
   const entry = cache.get(key);
-  if (entry && Date.now() - entry.ts < TTL_MS) {
+  if (entry && Date.now() - entry.ts < entry.ttl) {
     return entry.data as Promise<T>;
   }
   const data = fetcher();
-  cache.set(key, { ts: Date.now(), data });
+  cache.set(key, { ts: Date.now(), ttl, data });
   return data;
 }
 
@@ -57,6 +58,41 @@ export async function fetchPrices(
     }
     return result;
   });
+}
+
+export type CoinMetadata = { symbol: string; name: string };
+
+export async function fetchCoinMetadata(
+  coinIds: string[],
+  apiKey: string,
+): Promise<Map<string, CoinMetadata | null>> {
+  if (coinIds.length === 0) return new Map();
+
+  const all = await getCached(
+    "metadata:list",
+    async () => {
+      const result = new Map<string, CoinMetadata>();
+      try {
+        const url = `${BASE_URL}/coins/list`;
+        const res = await fetch(url, { headers: headers(apiKey) });
+        if (!res.ok) return result;
+        const json = (await res.json()) as Array<{ id: string; symbol: string; name: string }>;
+        for (const item of json) {
+          result.set(item.id, { symbol: item.symbol, name: item.name });
+        }
+      } catch {
+        // network error — return empty map
+      }
+      return result;
+    },
+    METADATA_TTL_MS,
+  );
+
+  const filtered = new Map<string, CoinMetadata | null>();
+  for (const id of coinIds) {
+    filtered.set(id, all.get(id) ?? null);
+  }
+  return filtered;
 }
 
 export async function searchCoins(

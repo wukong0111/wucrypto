@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { clearCache, fetchPrices, searchCoins, validateApiKey } from "./coingecko";
+import {
+  clearCache,
+  fetchCoinMetadata,
+  fetchPrices,
+  searchCoins,
+  validateApiKey,
+} from "./coingecko";
 
 const originalFetch = globalThis.fetch;
 
@@ -129,6 +135,73 @@ describe("searchCoins", () => {
     // @ts-expect-error Bun's fetch type has extra properties
     globalThis.fetch = testMock;
     await searchCoins("bit", "my-key");
+    const calls = testMock.mock.calls as unknown as Array<
+      [string, { headers: Record<string, string> }]
+    >;
+    expect(calls[0]?.[1]?.headers?.["x-cg-demo-api-key"]).toBe("my-key");
+  });
+});
+
+describe("fetchCoinMetadata", () => {
+  test("returns metadata for requested coins", async () => {
+    mockFetchResponse([
+      { id: "bitcoin", symbol: "btc", name: "Bitcoin" },
+      { id: "ethereum", symbol: "eth", name: "Ethereum" },
+    ]);
+    const metadata = await fetchCoinMetadata(["bitcoin", "ethereum"], "test-key");
+    expect(metadata.get("bitcoin")?.symbol).toBe("btc");
+    expect(metadata.get("bitcoin")?.name).toBe("Bitcoin");
+    expect(metadata.get("ethereum")?.symbol).toBe("eth");
+  });
+
+  test("returns null for coins not in the list", async () => {
+    mockFetchResponse([{ id: "bitcoin", symbol: "btc", name: "Bitcoin" }]);
+    const metadata = await fetchCoinMetadata(["bitcoin", "unknown"], "test-key");
+    expect(metadata.get("bitcoin")).not.toBeNull();
+    expect(metadata.get("unknown")).toBeNull();
+  });
+
+  test("returns empty map for empty ids", async () => {
+    const metadata = await fetchCoinMetadata([], "test-key");
+    expect(metadata.size).toBe(0);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  test("returns nulls on API error", async () => {
+    // @ts-expect-error same as above
+    globalThis.fetch = mock(() => Promise.resolve(new Response("error", { status: 500 })));
+    const metadata = await fetchCoinMetadata(["bitcoin"], "test-key");
+    expect(metadata.get("bitcoin")).toBeNull();
+  });
+
+  test("returns nulls on network error", async () => {
+    // @ts-expect-error same as above
+    globalThis.fetch = mock(() => Promise.reject(new Error("network")));
+    const metadata = await fetchCoinMetadata(["bitcoin"], "test-key");
+    expect(metadata.get("bitcoin")).toBeNull();
+  });
+
+  test("caches results within TTL", async () => {
+    mockFetchResponse([{ id: "bitcoin", symbol: "btc", name: "Bitcoin" }]);
+    const m1 = await fetchCoinMetadata(["bitcoin"], "test-key");
+    const m2 = await fetchCoinMetadata(["bitcoin"], "test-key");
+    expect(m1.get("bitcoin")?.symbol).toBe("btc");
+    expect(m2.get("bitcoin")?.symbol).toBe("btc");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test("sends API key header", async () => {
+    const testMock = mock(() =>
+      Promise.resolve(
+        new Response(JSON.stringify([{ id: "bitcoin", symbol: "btc", name: "Bitcoin" }]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    // @ts-expect-error Bun's fetch type has extra properties
+    globalThis.fetch = testMock;
+    await fetchCoinMetadata(["bitcoin"], "my-key");
     const calls = testMock.mock.calls as unknown as Array<
       [string, { headers: Record<string, string> }]
     >;

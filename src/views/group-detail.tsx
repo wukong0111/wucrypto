@@ -8,15 +8,30 @@ import { FormError } from "./components/FormError";
 import { Icon } from "./components/Icon";
 import { StatCard } from "./components/StatCard";
 
+type CoinMetadataDiscrepancy = {
+  coinId: string;
+  symbol: string;
+  name: string;
+  liveSymbol: string;
+  liveName: string;
+};
+
 type GroupDetailViewProps = {
   group: GroupMeta;
   coins: CoinFile[];
   derived: Map<string, CoinDerived>;
   summary: GroupSummary;
   prices: Map<string, number | null>;
+  discrepancies?: CoinMetadataDiscrepancy[];
 };
 
-const GroupDetailView: FC<GroupDetailViewProps> = ({ group, coins, derived, summary }) => {
+const GroupDetailView: FC<GroupDetailViewProps> = ({
+  group,
+  coins,
+  derived,
+  summary,
+  discrepancies = [],
+}) => {
   const pnlPct =
     summary.totalValueUsd > 0
       ? (summary.totalPnl / (summary.totalValueUsd - summary.totalPnl)) * 100
@@ -38,6 +53,47 @@ const GroupDetailView: FC<GroupDetailViewProps> = ({ group, coins, derived, summ
         />
         <StatCard label="Coins" value={String(coins.length)} />
       </div>
+
+      {discrepancies.length > 0 && (
+        <div class="mb-6 space-y-2">
+          {discrepancies.map((d) => (
+            <div
+              key={d.coinId}
+              id={`coin-meta-alert-${d.coinId}`}
+              class="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3 flex items-center justify-between"
+            >
+              <p class="text-sm text-yellow-200">
+                <span class="font-medium">
+                  {d.name} ({d.symbol.toUpperCase()})
+                </span>{" "}
+                is now listed as{" "}
+                <span class="font-medium">
+                  {d.liveName} ({d.liveSymbol.toUpperCase()})
+                </span>{" "}
+                on CoinGecko.
+              </p>
+              <div class="flex items-center gap-2 ml-4">
+                <button
+                  type="button"
+                  hx-put={`/groups/${group.id}/coins/${d.coinId}`}
+                  hx-target={`#coin-meta-alert-${d.coinId}`}
+                  hx-swap="outerHTML"
+                  class="bg-yellow-700 hover:bg-yellow-600 text-white text-xs font-medium px-3 py-1.5 rounded transition-colors"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  hx-on:click={`document.getElementById('coin-meta-alert-${d.coinId}').remove()`}
+                  class="text-yellow-400 hover:text-yellow-300 text-xs px-2 py-1.5"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
         <form
