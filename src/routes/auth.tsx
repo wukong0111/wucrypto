@@ -74,7 +74,7 @@ auth.post("/register", async (c) => {
 
   const token = await createSession(user.id);
   setCookie(c, "session_token", token, COOKIE_OPTS);
-  return c.redirect("/");
+  return c.redirect("/settings?error=missing_key");
 });
 
 auth.post("/logout", async (c) => {

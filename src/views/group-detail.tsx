@@ -103,9 +103,9 @@ const GroupDetailView: FC<GroupDetailViewProps> = ({
           data-err="add-coin-error"
         >
           <div class="flex gap-2">
-            <input type="hidden" name="coinId" id="add-coin-id" />
-            <input type="hidden" name="symbol" id="add-coin-symbol" />
-            <input type="hidden" name="name" id="add-coin-name" />
+            <input type="hidden" name="coinId" id="add-coin-id" autocomplete="off" />
+            <input type="hidden" name="symbol" id="add-coin-symbol" autocomplete="off" />
+            <input type="hidden" name="name" id="add-coin-name" autocomplete="off" />
             <div class="relative flex-1">
               <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                 <Icon name="search" class="w-4 h-4" />

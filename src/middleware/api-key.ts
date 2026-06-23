@@ -4,7 +4,7 @@ type ApiKeyEnv = {
   Variables: { user: { id: string; username: string; coingeckoApiKey: string | null } };
 };
 
-const EXACT_EXEMPTS = new Set(["/", "/groups"]);
+const EXACT_EXEMPTS = new Set(["/groups"]);
 
 export const apiKeyMiddleware = createMiddleware<ApiKeyEnv>(async (c, next) => {
   const path = c.req.path;

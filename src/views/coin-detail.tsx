@@ -61,6 +61,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
           <select
             id="mov-type"
             name="type"
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           >
             <option value="buy">Buy</option>
@@ -76,6 +77,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
             type="datetime-local"
             name="date"
             value={new Date().toISOString().slice(0, 16)}
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
@@ -89,6 +91,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
             step="any"
             name="amount"
             required
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
@@ -100,6 +103,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
             id="mov-total"
             type="number"
             step="any"
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
@@ -113,6 +117,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
             step="any"
             name="pricePerCoin"
             required
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
@@ -124,6 +129,7 @@ const CoinDetailView: FC<CoinDetailViewProps> = ({ coin, derived, groupId, group
             id="mov-note"
             type="text"
             name="note"
+            autocomplete="off"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>

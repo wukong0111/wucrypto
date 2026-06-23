@@ -25,6 +25,7 @@ const HomeView: FC<HomeViewProps> = ({ groups }) => (
           name="name"
           placeholder="New group name..."
           required
+          autocomplete="off"
           class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
         />
         <button
