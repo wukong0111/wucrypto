@@ -53,6 +53,7 @@ const SettingsView: FC<SettingsViewProps> = ({
             type="text"
             name="username"
             required
+            autocomplete="username"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 transition-colors"
           />
         </div>
@@ -147,6 +148,7 @@ const SettingsView: FC<SettingsViewProps> = ({
             id="coingecko-key"
             type="text"
             name="apiKey"
+            autocomplete="off"
             placeholder={
               coingeckoApiKey ? "Enter new key to update" : "Enter your CoinGecko API key"
             }

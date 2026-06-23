@@ -30,9 +30,27 @@ app.route("/", protectedRoutes);
 
 const port = Number(Bun.env["PORT"]) || 3000;
 
+const fetchWithDoctype: typeof app.fetch = async (request, env, executionCtx) => {
+  const response = await app.fetch(request, env, executionCtx);
+  const contentType = response.headers.get("Content-Type") ?? "";
+  if (!contentType.includes("text/html")) {
+    return response;
+  }
+  const clone = response.clone();
+  const body = await clone.text();
+  if (body.startsWith("<!DOCTYPE") || !body.includes("<html")) {
+    return response;
+  }
+  return new Response(`<!DOCTYPE html>\n${body}`, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+};
+
 console.log(`Crypto Tracker running on http://localhost:${port}`);
 
 export default {
   port,
-  fetch: app.fetch,
+  fetch: fetchWithDoctype,
 };

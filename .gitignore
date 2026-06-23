@@ -7,3 +7,13 @@ public/app.css
 .idea/
 .opencode/
 .pi/
+.playwright/
+.playwright-cli/
+home-*.yml
+register-*.yml
+settings-*.yml
+.playwright/
+.playwright-cli/
+home-*.yml
+register-*.yml
+settings-*.yml

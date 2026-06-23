@@ -16,5 +16,8 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
     return c.redirect("/login");
   }
   c.set("user", user);
+  c.header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  c.header("Pragma", "no-cache");
+  c.header("Expires", "0");
   await next();
 });

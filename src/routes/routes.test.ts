@@ -505,7 +505,7 @@ describe("auth", () => {
     expect(html).toContain("Create account");
   });
 
-  test("POST /register creates user and redirects", async () => {
+  test("POST /register creates user and redirects to settings when api key is missing", async () => {
     const app = createApp();
     const res = await app.request("/register", {
       method: "POST",
@@ -514,7 +514,7 @@ describe("auth", () => {
       redirect: "manual",
     });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/");
+    expect(res.headers.get("Location")).toBe("/settings?error=missing_key");
     const setCookie = res.headers.get("Set-Cookie");
     expect(setCookie).toContain("session_token=");
   });
@@ -802,7 +802,7 @@ describe("api key enforcement", () => {
     expect(html).toContain("Configure your CoinGecko API key");
   });
 
-  test("exempt routes work without api key", async () => {
+  test("redirects to settings when api key is missing on home", async () => {
     await truncateAll();
     const user = await createTestUserWithoutApiKey();
     const token = await createSession(user.id);
@@ -810,6 +810,25 @@ describe("api key enforcement", () => {
     const app = createApp();
     const res = await app.request("/", {
       headers: { Cookie: `session_token=${token}` },
+      redirect: "manual",
+    });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/settings?error=missing_key");
+  });
+
+  test("exempt routes work without api key", async () => {
+    await truncateAll();
+    const user = await createTestUserWithoutApiKey();
+    const token = await createSession(user.id);
+
+    const app = createApp();
+    const res = await app.request("/groups", {
+      method: "POST",
+      headers: {
+        Cookie: `session_token=${token}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: "name=testgroup",
     });
     expect(res.status).toBe(200);
   });
