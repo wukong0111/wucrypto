@@ -155,6 +155,11 @@ Biome is the only formatter/linter. No `prettier`, no `eslint`.
 - Pin exact Bun version: `"packageManager": "bun@1.3.13"` in `package.json`.
 - No `node_modules/.bin` indirection — use `bun x <tool>` or `bunx <tool>`.
 
+## Deployment
+
+Merging a PR into `main` triggers the `Deploy to Railway` workflow (`.github/workflows/deploy.yml`).
+To merge without deploying, include `[no-build]` or `[skip-deploy]` in the PR title.
+
 ## Verification checklist (run before every PR)
 
 1. `bun run lint:ci` passes.
