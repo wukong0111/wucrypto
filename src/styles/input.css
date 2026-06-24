@@ -16,3 +16,30 @@
   color: #f87171 !important;
   transform: scale(1.15);
 }
+
+.toast {
+  animation: toast-in 0.3s ease-out;
+}
+.toast.hiding {
+  animation: toast-out 0.3s ease-in forwards;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}

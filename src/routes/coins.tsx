@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { calcGroupSummary, calcPnl } from "../lib/calc";
 import { fetchCoinMetadata, fetchPrices, searchCoins } from "../lib/coingecko";
 import { deleteCoin, getCoin, getGroup, listCoins, upsertCoin } from "../lib/storage";
+import { Toast } from "../views/components/Toast";
 import GroupDetailView, { CoinRow } from "../views/group-detail";
 import Layout from "../views/layout";
 
@@ -100,8 +101,10 @@ coins.post("/groups/:groupId/coins", async (c) => {
 coins.delete("/groups/:groupId/coins/:coinId", async (c) => {
   const user = c.get("user");
   const { groupId, coinId } = c.req.param();
+  const coin = await getCoin(user.id, groupId, coinId);
+  if (!coin) return c.text("Coin not found", 404);
   await deleteCoin(user.id, groupId, coinId);
-  return c.text("", 200);
+  return c.html(<Toast message={`Se ha eliminado la moneda ${coin.name}`} />);
 });
 
 coins.put("/groups/:groupId/coins/:coinId", async (c) => {

@@ -144,9 +144,11 @@ describe("DELETE /groups/:groupId", () => {
       headers: withAuth(),
     });
     expect(res.status).toBe(200);
+    const resHtml = await res.text();
+    expect(resHtml).toContain("Se ha eliminado el grupo Test");
     const listRes = await app.request("/", { headers: withAuth() });
-    const html = await listRes.text();
-    expect(html).not.toContain("Test");
+    const listHtml = await listRes.text();
+    expect(listHtml).not.toContain("Test");
   });
 });
 
@@ -356,6 +358,8 @@ describe("DELETE /groups/:groupId/coins/:coinId", () => {
       headers: withAuth(),
     });
     expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Se ha eliminado la moneda Bitcoin");
   });
 });
 
@@ -431,6 +435,8 @@ describe("DELETE /groups/:groupId/coins/:coinId/movements/:movId", () => {
       headers: withAuth(),
     });
     expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Se ha eliminado el movimiento");
   });
 });
 

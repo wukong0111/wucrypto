@@ -97,6 +97,24 @@ This project uses **Bun** as the exclusive runtime, package manager, and test ru
 - Inline JavaScript (`<script>`) only when strictly necessary (e.g. client-side sort).
 - HTMX is self-hosted at `public/htmx.min.js`.
 
+### E2E testing (Playwright)
+
+Frontend feature modifications or additions (HTMX interactions, views, user-visible behavior) are verified with Playwright e2e tests, on top of the unit tests in `src/`.
+
+- Config: `playwright.config.ts` at repo root. Tests in `e2e/` (`*.spec.ts`).
+- `bun run test:e2e` runs the suite; `bun run test:e2e:ui` opens the interactive runner.
+- The `webServer` config boots `bun src/index.tsx` against a test DB (`wucrypto_test`) with `MOCK_COINGECKO_API_KEY` so no real CoinGecko calls are made. `reuseExistingServer: true` — kill any stale server on port 3000 before a clean run.
+- Unit tests (`bun run test`) are scoped to `src/` so Playwright specs in `e2e/` are not picked up by `bun:test`.
+
+**Workflow for a frontend change:**
+
+1. Implement the view/route change.
+2. Add or update unit tests in `src/` for the route response (`routes.test.ts`).
+3. Add an e2e spec in `e2e/` covering the full user flow (register → configure → exercise the feature → assert visible result and side effects).
+4. Prefer Playwright auto-waiting (`expect(locator).toBeVisible()`) over hardcoded `waitForTimeout`. Assert on state (classes, attributes) rather than sleeping.
+5. Run `bun run build:css` before e2e if CSS changes are not yet built.
+6. Verify: `bun run lint:ci`, `bun run typecheck`, `bun run test`, `bun run test:e2e` — all green.
+
 ### CSS
 
 - Tailwind v4 via `@tailwindcss/cli`.

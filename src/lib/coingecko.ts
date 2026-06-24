@@ -23,6 +23,9 @@ function headers(apiKey: string): Record<string, string> {
 }
 
 export async function validateApiKey(apiKey: string): Promise<boolean> {
+  if (Bun.env["MOCK_COINGECKO_API_KEY"] && apiKey === Bun.env["MOCK_COINGECKO_API_KEY"]) {
+    return true;
+  }
   try {
     const url = `${BASE_URL}/ping`;
     const res = await fetch(url, { headers: headers(apiKey) });

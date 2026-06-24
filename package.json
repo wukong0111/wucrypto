@@ -11,7 +11,9 @@
     "typecheck": "bun tsc --noEmit",
     "lint": "bun x biome check --write .",
     "lint:ci": "bun x biome ci .",
-    "test": "DATABASE_URL=postgres://wucrypto:wucrypto@localhost:5432/wucrypto_test bun test",
+    "test": "DATABASE_URL=postgres://wucrypto:wucrypto@localhost:5432/wucrypto_test bun test src",
+    "test:e2e": "DATABASE_URL=postgres://wucrypto:wucrypto@localhost:5432/wucrypto_test bunx playwright test",
+    "test:e2e:ui": "DATABASE_URL=postgres://wucrypto:wucrypto@localhost:5432/wucrypto_test bunx playwright test --ui",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:push": "bunx drizzle-kit push",
@@ -24,9 +26,12 @@
   },
   "devDependencies": {
     "@biomejs/biome": "1.9.4",
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/cli": "^4.2.0",
     "@types/bun": "^1.2.0",
+    "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",
+    "playwright": "^1.61.1",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.8.0"
   }

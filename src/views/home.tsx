@@ -76,7 +76,7 @@ export const GroupItem: FC<GroupItemProps> = ({ group }) => (
       type="button"
       hx-delete={`/groups/${group.id}`}
       hx-target={`#group-${group.id}`}
-      hx-swap="outerHTML"
+      hx-swap="delete"
       data-confirm-delete
       title="Delete group"
       class="text-gray-600 hover:text-red-400 transition-colors p-1 rounded"

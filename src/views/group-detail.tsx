@@ -259,7 +259,7 @@ export const CoinRow: FC<CoinRowProps> = ({ coin, derived, groupId }) => {
           type="button"
           hx-delete={`/groups/${groupId}/coins/${coin.coinId}`}
           hx-target={`#coin-${coin.coinId}`}
-          hx-swap="outerHTML"
+          hx-swap="delete"
           data-confirm-delete
           title="Delete coin"
           class="text-gray-600 hover:text-red-400 transition-colors p-1 rounded"

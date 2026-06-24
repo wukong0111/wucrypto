@@ -3,6 +3,7 @@ import { calcPnl } from "../lib/calc";
 import { fetchPrices } from "../lib/coingecko";
 import { addMovement, deleteMovement, getCoin, getGroup } from "../lib/storage";
 import CoinDetailView, { MovementRow } from "../views/coin-detail";
+import { Toast } from "../views/components/Toast";
 import Layout from "../views/layout";
 
 const movements = new Hono<{
@@ -70,8 +71,12 @@ movements.post("/groups/:groupId/coins/:coinId/movements", async (c) => {
 movements.delete("/groups/:groupId/coins/:coinId/movements/:movId", async (c) => {
   const user = c.get("user");
   const { groupId, coinId, movId } = c.req.param();
+  const coin = await getCoin(user.id, groupId, coinId);
+  if (!coin) return c.text("Coin not found", 404);
+  const movement = coin.movements.find((m) => m.id === movId);
+  if (!movement) return c.text("Movement not found", 404);
   await deleteMovement(user.id, groupId, coinId, movId);
-  return c.text("", 200);
+  return c.html(<Toast message="Se ha eliminado el movimiento" />);
 });
 
 export default movements;
