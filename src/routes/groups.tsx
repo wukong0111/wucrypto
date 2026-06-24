@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { createGroup, deleteGroup, listGroups } from "../lib/storage";
+import { createGroup, deleteGroup, getGroup, listGroups } from "../lib/storage";
+import { Toast } from "../views/components/Toast";
 import HomeView, { GroupItem } from "../views/home";
 import Layout from "../views/layout";
 
@@ -33,8 +34,10 @@ groups.post("/groups", async (c) => {
 groups.delete("/groups/:groupId", async (c) => {
   const user = c.get("user");
   const { groupId } = c.req.param();
+  const group = await getGroup(user.id, groupId);
+  if (!group) return c.text("Group not found", 404);
   await deleteGroup(user.id, groupId);
-  return c.text("", 200);
+  return c.html(<Toast message={`Se ha eliminado el grupo ${group.name}`} />);
 });
 
 export default groups;

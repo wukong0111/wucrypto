@@ -32,6 +32,35 @@ function resetConfirm(btn) {
 }
 `;
 
+const toastScript = `
+function dismissToast(node) {
+  if (!node || node.classList.contains("hiding")) return;
+  var timer = node.dataset.toastTimer;
+  if (timer) {
+    clearTimeout(Number(timer));
+    delete node.dataset.toastTimer;
+  }
+  node.classList.add("hiding");
+  node.addEventListener("animationend", function() {
+    if (node.parentNode) node.remove();
+  });
+}
+var toastContainer = document.getElementById("toast-container");
+if (toastContainer) {
+  var toastObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      for (var i = 0; i < mutation.addedNodes.length; i++) {
+        var node = mutation.addedNodes[i];
+        if (node.nodeType === 1 && node.hasAttribute("data-toast")) {
+          node.dataset.toastTimer = String(setTimeout(function() { dismissToast(node); }, 4000));
+        }
+      }
+    });
+  });
+  toastObserver.observe(toastContainer, { childList: true });
+}
+`;
+
 const htmxConfig = `
 htmx.config.responseHandling = [
   {code:"204", swap:false},
@@ -65,11 +94,14 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({ title, username, children 
     </head>
     <body class="bg-gray-950 text-gray-100 min-h-screen">
       <Navbar username={username} />
+      <div id="toast-container" class="fixed top-20 right-4 z-50 flex flex-col gap-2 items-end" />
       <main class="max-w-4xl mx-auto px-4 py-8">{children}</main>
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static htmx config, no user input */}
       <script dangerouslySetInnerHTML={{ __html: htmxConfig }} />
       {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static confirm script, no user input */}
       <script dangerouslySetInnerHTML={{ __html: confirmScript }} />
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml: static toast script, no user input */}
+      <script dangerouslySetInnerHTML={{ __html: toastScript }} />
     </body>
   </html>
 );
